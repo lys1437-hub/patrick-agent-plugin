@@ -26,7 +26,7 @@ claude plugin install patrick-agent@patrick-agent-marketplace
 
 ## ⚠️ 這個 repo 是產生出來的，不要直接編輯
 
-`skills/` 底下的內容由 `Patrick-agent` repo 的 `000_Agent/scripts/build_plugin.py`
-複製過來。**在這裡改會在下次 build 被覆蓋。**
+`skills/` 底下的內容是從作者的私有 repo **產生**出來的，
+複製時會做環境淨化（把指向作者本機的引用改寫成對方看得懂的說明）。
 
-要改內容請改上游的 `000_Agent/skills/<name>/SKILL.md`。
+**在這裡改會在下次 build 被覆蓋。** 有問題或想改內容，直接跟作者說。
