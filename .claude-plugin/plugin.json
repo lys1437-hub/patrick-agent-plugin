@@ -1,0 +1,19 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "patrick-agent",
+  "version": "0.2.0",
+  "description": "LipiD 的產品工作方法：功能提案規劃與成效檢視（E1–E4 證據分級、Pilot 實驗設計、口徑閘門）。繁體中文。",
+  "author": {
+    "name": "LipiD",
+    "email": "lys1437@gmail.com"
+  },
+  "keywords": [
+    "product-management",
+    "zh-TW",
+    "proposal",
+    "evidence-grading"
+  ],
+  "skills": [
+    "./skills"
+  ]
+}

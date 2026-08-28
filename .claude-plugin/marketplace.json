@@ -1,0 +1,14 @@
+{
+  "name": "patrick-agent-marketplace",
+  "description": "LipiD 的產品工作方法 skill 包。內容由 Patrick-agent repo 的 build_plugin.py 產生，不要直接編輯 skills/。",
+  "owner": {
+    "name": "LipiD"
+  },
+  "plugins": [
+    {
+      "name": "patrick-agent",
+      "source": "./",
+      "description": "功能提案規劃與成效檢視：E1–E4 證據分級、Pilot 實驗設計、口徑閘門。繁體中文。"
+    }
+  ]
+}
