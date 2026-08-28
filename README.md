@@ -30,3 +30,25 @@ claude plugin install patrick-agent@patrick-agent-marketplace
 複製時會做環境淨化（把指向作者本機的引用改寫成對方看得懂的說明）。
 
 **在這裡改會在下次 build 被覆蓋。** 有問題或想改內容，直接跟作者說。
+
+
+---
+
+## 安裝實績（2026-08-28 首次跨機器驗證）
+
+| 通路 | 狀態 |
+|---|---|
+| `codex plugin marketplace add lys1437-hub/patrick-agent-plugin` | ✅ **可行** —— private repo 會沿用對方的 `gh` 認證 |
+| `claude plugin marketplace add <本機路徑>` | ✅ 已驗 |
+| Claude Code 對 private GitHub repo | 🟡 未測（Codex 那條通了，這條沒理由不通，但沒實測過） |
+
+⚠️ **權限的已知限制**：這個 repo 在**個人帳號**底下，
+GitHub 不支援個人 repo 的細分 collaborator 權限（read／triage／write 是 org 功能）。
+所以受邀者拿到的是 **write**，`gh api ... -f permission=pull` 會回 204 但沒有效果。
+
+**風險已評估為趨近零**：內容是 `build_plugin.py` 產生的、下次 build 就覆蓋、不含機密。
+真要唯讀只能建 GitHub Organization。
+
+### 桌面版沒有 `/plugin`
+
+實測回 `isn't available in this environment`，一律走 CLI。
