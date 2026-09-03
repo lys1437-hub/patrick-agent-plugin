@@ -44,4 +44,4 @@ SOFTWARE.
 ## 這包沒有帶走什麼
 
 `systematic-debugging`（同樣來自 obra/superpowers，MIT）**不在本包內**。
-招式二提到「根因未知時轉 `systematic-debugging`（obra/superpowers，MIT，需自行安裝上游）（obra/superpowers，MIT，需自行安裝上游）」——需要自行安裝上游。
+招式二提到「根因未知時轉 `systematic-debugging`（obra/superpowers，MIT，需自行安裝上游）」——需要自行安裝上游。

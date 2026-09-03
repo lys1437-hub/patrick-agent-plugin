@@ -25,7 +25,7 @@ last-updated: 2026-08-30
 
 - 只是要查數字或跑分析 → 用 `igaming-ops-analysis`
 - 功能已定案、要寫開發規格 / PRD → 直接寫規格，不需要提案論證
-- 要拆 story、寫 AC / DoD → 用 `ogg-*` 系列（**雇主環境專用，不在本 plugin 內**）（**雇主環境專用，不在本 plugin 內**）
+- 要拆 story、寫 AC / DoD → 用 `ogg-*` 系列（**雇主環境專用，不在本 plugin 內**）
 - 一次性的簡報排版美化
 
 ---
