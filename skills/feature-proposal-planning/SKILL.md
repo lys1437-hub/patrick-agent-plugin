@@ -1,10 +1,10 @@
 ---
 name: feature-proposal-planning
 provenance: 自建｜E1–E4 證據分級、Pilot 設計
-version: 0.2.0
+version: 0.3.0
 description: 功能提案規劃與成效檢視。**不用於純數據查詢（改用 igaming-ops-analysis，不在本包）、開發規格、Jira 拆解、簡報美化。** 觸發：「做功能提案」「這功能要不要做」「規劃活動機制」「成效檢視」「health check」「competitive review」。
 user-invocable: true
-last-updated: 2026-08-20
+last-updated: 2026-08-30
 ---
 
 # 功能提案規劃
@@ -159,6 +159,17 @@ last-updated: 2026-08-20
 Non-blocking 的項目要註明「上線後可調」，讓決策者知道現在不用糾結。
 
 底部列出已備妥的交付物與版本號。
+
+### Step 9：GO 後才轉成專案意圖
+
+提案回答「值不值得投資」，不是開發的唯一事實來源，也不等於 `INTENT.md`。
+
+- **GO**：**取得使用者明確核准後**，依你們自己的專案生命週期文件與 INTENT 範本
+  （本包不提供，由使用者環境提供；沒有的話就先跟使用者確認要寫哪些欄位）
+  把已核准的目標、非目標、成果與硬限制寫進新專案資料夾。之後才判斷是否需要 `SPEC.md`，最後形成 `PLAN.md`。
+- **NO-GO／待補證據**：保留提案與決策結果，不建立假的專案意圖，也不往開發計畫跳。
+
+轉換時要保留提案來源與核准日期；不要把未核准的 E3／E4 推論悄悄升格成硬需求。
 
 ---
 
