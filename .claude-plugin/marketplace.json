@@ -1,6 +1,6 @@
 {
   "name": "patrick-agent-marketplace",
-  "description": "LipiD 的產品工作方法 skill 包。內容由 Patrick-agent repo 的 build_plugin.py 產生，不要直接編輯 skills/。",
+  "description": "LipiD 的產品工作方法 skill 包，以及一份團隊 L1 範本（TEAM_RULES.md）。內容由 build_plugin.py 產生，不要直接編輯 skills/。另收錄指向上游的 plugin —— 那些是別人的作品，這裡只給地址並釘住版本。",
   "owner": {
     "name": "LipiD"
   },
@@ -9,6 +9,15 @@
       "name": "patrick-agent",
       "source": "./",
       "description": "功能提案規劃與成效檢視：E1–E4 證據分級、Pilot 實驗設計、口徑閘門。繁體中文。"
+    },
+    {
+      "name": "superpowers",
+      "source": {
+        "source": "github",
+        "repo": "obra/superpowers",
+        "sha": "b36e0829c6d0140e93cfef2ca599b1b07d4a7797"
+      },
+      "description": "obra/superpowers v6.3.0（MIT）—— brainstorm／systematic-debugging／test-driven-development 等核心方法論。**這是上游的作品，本包沒有複製它，只是指向並釘住 commit。** 要升級請改這裡的 sha，不要 fork。"
     }
   ]
 }
