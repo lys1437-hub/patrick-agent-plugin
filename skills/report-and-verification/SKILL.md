@@ -80,7 +80,7 @@ description: "**簡單問答不套用。** 實際交付、修改、發布、操�
 7. **Verification Contract 逐項結案**：PLAN 若有 Contract，以 Check ID 為單位執行，
    `Proof` 只寫當次實際結果與證據。未執行就寫 `not_run` 與理由，不得宣稱完成。
    - 已知實作問題：修正後重跑同一 Check ID。
-   - 根因未知：停止無限重跑或猜修，轉 `systematic-debugging`（obra/superpowers，MIT，需自行安裝上游）。
+   - 根因未知：停止無限重跑或猜修，轉 `systematic-debugging`（obra/superpowers，MIT，需自行安裝上游）（obra/superpowers，MIT，需自行安裝上游）。
    - 結果與 INTENT／SPEC 衝突：停止實作，回上游重新核准，不改 SPEC 迎合結果。
    - AI 無法驗證：保留 `human` check，指名 Owner，不以「看起來正常」代替。
 
