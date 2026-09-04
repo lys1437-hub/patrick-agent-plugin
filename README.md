@@ -77,7 +77,32 @@ claude plugin marketplace add anthropics/skills
 |---|---|
 | `codex plugin marketplace add lys1437-hub/patrick-agent-plugin` | ✅ **可行** —— private repo 會沿用對方的 `gh` 認證 |
 | `claude plugin marketplace add <本機路徑>` | ✅ 已驗 |
-| Claude Code 對 private GitHub repo | 🟡 未測（Codex 那條通了，這條沒理由不通，但沒實測過） |
+| Claude Code 對 private GitHub repo | ✅ **2026-09-04 實測通過** —— 見下 |
+
+### 2026-09-04：Claude Code 端端到端實測
+
+```
+claude plugin marketplace add lys1437-hub/patrick-agent-plugin
+  → SSH not configured, cloning via HTTPS  →  ✔ Successfully added
+claude plugin install patrick-agent@patrick-agent-marketplace
+  → ✔ Successfully installed (scope: user)
+claude plugin list
+  → patrick-agent@patrick-agent-marketplace  0.4.0  ✔ enabled
+```
+
+安裝結果落在 `~/.claude/plugins/cache/.../0.4.0`，**釘住 `gitCommitSha`**（`1e7a1b5`），
+5 支 skill ＋ `TEAM_RULES.md` ＋ `WHY-THESE-RULES.md` 都在，
+`one-page-report` 的檢查器從安裝後的位置也跑得起來（exit 0）。
+
+🔴 **順帶修掉一個錯的前提**：實測前，本機註冊的 marketplace 指向
+`/Users/patrick.lee/projects/Patrick-agent` —— **個人 repo，那個絕不能加 collaborator 的**。
+是 2026-08-28 拆 repo 之前的殘留，本機是 `directory` 來源所以沒出事，
+但**團隊化整套設計的第一個前提，在本機設定裡是錯的，而且錯了 7 天沒人發現。**
+
+⚠️ **作者自己的機器裝這包會有 5 支同名 skill 各兩份**（個人 `~/.claude/skills` 一份、
+plugin cache 一份）。plugin 端有 `plugin:skill` 命名空間所以不是硬衝突，
+但路由的選項裡會出現兩個幾乎一樣的描述 —— 同一天在 `report-page` 上already 踩過。
+**作者機器讀正本就好，這包是給別人裝的。**
 
 ⚠️ **權限的已知限制**：這個 repo 在**個人帳號**底下，
 GitHub 不支援個人 repo 的細分 collaborator 權限（read／triage／write 是 org 功能）。
