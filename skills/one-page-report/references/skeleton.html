@@ -1,0 +1,110 @@
+<!doctype html>
+<!-- 一頁式報告起手式。整份複製後改內容，不要每次從空白開始重寫 CSS。
+     這個檔案本身通過 scripts/check_page.py --print。 -->
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>報告標題</title>
+<style>
+:root{
+  --bg:#F7F5F2; --card:#FFF; --ink:#221F1C; --muted:#6E6862; --rule:rgba(0,0,0,.11);
+  --accent:#21A4B1; --accent-soft:rgba(33,164,177,.11);
+  --good:#3D7A4E;  --good-soft:rgba(61,122,78,.10);
+  --warn:#C25A2B;  --warn-soft:rgba(194,90,43,.11);
+  --bad:#B3392E;   --bad-soft:rgba(179,57,46,.10);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15130F; --card:#211E1A; --ink:#EDE7E0; --muted:#A29A91; --rule:rgba(255,255,255,.14);
+    --accent:#4FC7D3; --accent-soft:rgba(79,199,211,.14);
+    --good:#7FBF92;  --good-soft:rgba(127,191,146,.14);
+    --warn:#E88A55;  --warn-soft:rgba(232,138,85,.15);
+    --bad:#E5726A;   --bad-soft:rgba(229,114,106,.15);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15130F; --card:#211E1A; --ink:#EDE7E0; --muted:#A29A91; --rule:rgba(255,255,255,.14);
+  --accent:#4FC7D3; --accent-soft:rgba(79,199,211,.14);
+  --good:#7FBF92;  --good-soft:rgba(127,191,146,.14);
+  --warn:#E88A55;  --warn-soft:rgba(232,138,85,.15);
+  --bad:#E5726A;   --bad-soft:rgba(229,114,106,.15);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Helvetica Neue","PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+  line-height:1.65;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.wrap{max-width:940px;margin:0 auto;padding:40px 22px 72px}
+h1{font-size:1.75rem;margin:0 0 6px;letter-spacing:.01em}
+h2{font-size:1.12rem;margin:34px 0 12px;padding-bottom:7px;border-bottom:1px solid var(--rule)}
+.meta{color:var(--muted);font-size:.86rem;margin:0 0 26px}
+.card{background:var(--card);border:1px solid var(--rule);border-radius:10px;
+  padding:16px 18px;margin:0 0 14px;break-inside:avoid}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.chip{display:inline-block;font-size:.76rem;font-weight:700;padding:2px 9px;border-radius:999px}
+.chip.good{background:var(--good-soft);color:var(--good)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.bad {background:var(--bad-soft); color:var(--bad)}
+.kpi .n{font-size:1.6rem;font-weight:700;line-height:1.1}
+.kpi .lab{color:var(--muted);font-size:.8rem}
+.scroll{overflow-x:auto}            /* 寬表格自己捲，頁面本體不左右捲 */
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--rule);vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:.8rem}
+.theme-toggle{position:fixed;right:18px;top:18px;background:var(--card);color:var(--ink);
+  border:1px solid var(--rule);border-radius:999px;padding:6px 13px;font-size:.8rem;cursor:pointer}
+@page{size:A4 portrait;margin:12mm}
+@media print{
+  .theme-toggle{display:none}
+  body{background:#fff}
+  .wrap{max-width:none;padding:0}
+  .card{break-inside:avoid;box-shadow:none}
+  h2{break-after:avoid}
+}
+</style></head><body>
+<button class="theme-toggle" id="theme-toggle">深／淺</button>
+<div class="wrap">
+
+  <h1>結論寫在標題，不要寫主題</h1>
+  <p class="meta">日期 · 資料口徑 · 誰要看這頁</p>
+
+  <!-- 1 結論先行：第一屏就要能回答「所以呢」 -->
+  <div class="grid">
+    <div class="card kpi"><div class="n">0 / 13</div><div class="lab">通過的項目</div></div>
+    <div class="card kpi"><div class="n">+2pp</div><div class="lab">最小可偵測效果</div></div>
+  </div>
+
+  <!-- 2 證據：數字旁邊寫出處與口徑 -->
+  <h2>證據</h2>
+  <div class="card scroll">
+    <table>
+      <thead><tr><th>項目</th><th>數字</th><th>出處／口徑</th><th>狀態</th></tr></thead>
+      <tbody>
+        <tr><td>—</td><td>—</td><td>—</td><td><span class="chip good">通過</span></td></tr>
+        <tr><td>—</td><td>—</td><td>—</td><td><span class="chip bad">未達</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 3 只在回報自己做的工作時放 -->
+  <h2>我自己搞錯的</h2>
+  <div class="card">過程中被推翻的判斷：錯在哪、怎麼發現的。</div>
+
+  <!-- 4 沒有這段，讀的人不知道要回你什麼 -->
+  <h2>還沒做完 · 需要拍板</h2>
+  <div class="card"><span class="chip warn">待決定</span> 誰要決定什麼，卡在哪。</div>
+
+</div>
+<script>
+(function(){
+  var root=document.documentElement, KEY='one-page-report-theme', saved=null;
+  try{ saved=localStorage.getItem(KEY); }catch(e){}
+  if(saved==='light'||saved==='dark'){ root.dataset.theme=saved; root.style.colorScheme=saved; }
+  var b=document.getElementById('theme-toggle');
+  if(b) b.addEventListener('click',function(){
+    var cur=root.dataset.theme||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+    var next=cur==='dark'?'light':'dark';
+    root.dataset.theme=next; root.style.colorScheme=next;
+    try{ localStorage.setItem(KEY,next); }catch(e){}
+  });
+})();
+</script>
+</body></html>
