@@ -101,7 +101,7 @@ claude plugin list
 
 ⚠️ **作者自己的機器裝這包會有 5 支同名 skill 各兩份**（個人 `~/.claude/skills` 一份、
 plugin cache 一份）。plugin 端有 `plugin:skill` 命名空間所以不是硬衝突，
-但路由的選項裡會出現兩個幾乎一樣的描述 —— 同一天在 `report-page` 上already 踩過。
+但路由的選項裡會出現兩個幾乎一樣的描述 —— 同一天才在 `report-page` 上踩過。
 **作者機器讀正本就好，這包是給別人裝的。**
 
 ⚠️ **權限的已知限制**：這個 repo 在**個人帳號**底下，
