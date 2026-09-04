@@ -1,7 +1,7 @@
 {
   "name": "patrick-agent",
-  "version": "0.3.0",
-  "description": "LipiD 的產品工作方法：功能提案規劃與成效檢視（E1–E4 證據分級、Pilot 實驗設計、口徑閘門），以及交付回報與驗收紀律（四種回報狀態、證據自查、資料與推論可信度檢核）。繁體中文。",
+  "version": "0.4.0",
+  "description": "LipiD 的產品工作方法，5 支 skill：功能提案規劃與成效檢視（E1–E4 證據分級、Pilot 實驗設計、口徑閘門）、交付回報與驗收紀律（四種回報狀態、證據自查）、收料檢核（跨端交付的視角與時間分界）、skill 體檢（斷引用、路徑耦合、description 截斷）、一頁式報告（單檔自包含 HTML，附交付前檢查器）。另附團隊 L1 範本 TEAM_RULES.md。繁體中文。",
   "author": {
     "name": "LipiD",
     "email": "lys1437@gmail.com"
