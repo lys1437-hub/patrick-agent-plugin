@@ -60,7 +60,7 @@
 ## L3 過關 = 產出通過該 skill 自己的驗收標準
 
 不是「有東西產出」，是**那個東西過得了它自己寫的檢查**。
-例：`one-page-report` 的 L3 過關條件是 `scripts/check_page.py` 退出碼 0，不是「有一份 HTML」。
+例：`one-page-report` 的 L3 過關條件是 `skills/one-page-report/scripts/check_page.py` 退出碼 0，不是「有一份 HTML」。
 
 ## 現況（2026-09-04，誠實版）
 
