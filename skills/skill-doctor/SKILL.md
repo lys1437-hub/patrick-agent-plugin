@@ -34,13 +34,15 @@ description: 掃你的 skill 目錄健康度：斷引用、硬編絕對路徑、
 
 ## 用法
 
-派工給 `skill-doctor:skill-auditor` subagent。它只有 Read／Grep／Glob，**改不壞任何東西**。
+在主對話直接跑，**唯讀**：只用 Read／Grep／Glob，不要動任何檔案。
+
+⚠️ **本包不含 subagent 定義**（作者本機有一支只有唯讀工具的 agent，但 plugin 未宣告 agents，你這邊拿不到）。**所以沒有工具層的保護，只有上面那條紀律。** 這一點務必當真：授權必須發生在清單出現之後。
 
 ## 四項檢查
 
 | # | 檢查 | 判準 |
 |---|---|---|
-| 1 | **斷引用** | 文件裡 `` `檔名` `` 形式的引用，實際解析得到嗎 |
+| 1 | **斷引用** | 文件或 skill 引用實際解析得到嗎；plugin skill 要以當前環境分級，不冒充本機檔案 |
 | 2 | **硬編絕對路徑** | 有沒有家目錄開頭的絕對路徑（macOS 是 `Users`、Linux 是 `home`）。換機器會斷且不報錯 |
 | 3 | **description 截斷** | 觸發詞與排除條件有沒有落在**前 123 字元**內 |
 | 4 | **provenance** | frontmatter 有沒有標來歷（決定能不能散布） |
@@ -55,8 +57,22 @@ description: 掃你的 skill 目錄健康度：斷引用、硬編絕對路徑、
 | `personal-wiki` 引用 `INDEX.md`、`_sources.md` | 那是**它自己會產生**的檔案，本來就不該預先存在 |
 | `tw-chokepoint-analysis` 引用 `_skeleton.md` | 那是 `run_monthly.py` 的**產出物** |
 | `create-good-skills` 提到 `skill-creator` | 出現在 **changelog 講外部產品**，不是引用 |
+| `feature-proposal-planning` 引用 `anthropic-skills:ogg-*` | 這是 plugin 提供的 skill family，不是 repo 內檔案；應查當前 runtime 的可見 skill catalog |
 
 **每一筆都要解析到實際路徑才能報。** 報一份假清單比不報更糟 —— 它會讓人以為掃過了。
+
+### Plugin skill 不得報成死指標
+
+引用形如 `` `provider:name` `` 或 `` `provider:name-*` `` 時，先把它當成 **plugin skill 引用**，
+不要拿去套四個檔案基準：
+
+- 當前 runtime 的可見 skill catalog 有精確名稱或至少一個 family match：標示「本環境已解析」，不報斷引用。
+- catalog 可查但零匹配：列為「外部 skill 未安裝或名稱錯誤」，附 provider、引用與查過的 catalog；
+  不寫成 repo 內死檔案。
+- catalog 在受測環境不可查：列為「外部依賴未驗證」，不能宣稱已通過，也不能宣稱所有平台都缺少。
+
+**結果必須綁定環境。** Claude 看得到，只能證明 Claude 當前環境可用；不能外推成 Codex、
+另一台機器或團隊成員也已安裝。不要掃 plugin cache 路徑代替 runtime catalog —— cache 存在不等於已載入。
 
 ## 完成條件
 

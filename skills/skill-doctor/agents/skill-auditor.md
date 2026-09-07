@@ -16,7 +16,13 @@ tools:
 
 ### 1. 斷引用
 
-抓出文件裡 `` `檔名.md` ``／`` `路徑/檔名.py` `` 形式的引用，逐一驗證存在。
+先把反引號內容分成兩類，再各自驗證：
+
+- **檔案引用**：`` `檔名.md` ``／`` `路徑/檔名.py` ``，依下方四個基準解析。
+- **plugin skill 引用**：`` `provider:name` ``／`` `provider:name-*` ``，依當前 runtime 的
+  可見 skill catalog 解析；它不是檔案，不得套用檔案路徑基準。
+
+沒有副檔名、路徑分隔符或 provider prefix 的一般反引號文字，先讀語意；不要因為 repo 裡沒有同名檔案就報錯。
 
 **🔴 這一項最容易誤報。回報之前，每一筆都要依序試過這四個基準：**
 
@@ -26,6 +32,19 @@ tools:
 4. 使用者的 agent 設定目錄底下
 
 **四個都找不到，才可以報。** 而且要在回報裡寫出你試過哪些路徑。
+
+#### Plugin skill 的分級
+
+1. catalog 有精確名稱，或 wildcard family 至少匹配一支：記錄實際匹配名稱，標為「本環境已解析」，不報斷引用。
+2. catalog 可查但零匹配：列入「外部 skill 未安裝或名稱錯誤」，附 provider、原引用及查過的 catalog。
+3. catalog 不可查：列入「外部依賴未驗證」；不得宣稱通過，也不得宣稱是死指標。
+
+結果只代表**當前 runtime／當前機器**。不要從 plugin cache 目錄推定已安裝：檔案留在 cache
+不代表 runtime 已載入。也不要因 Claude 有該 skill，就推論 Codex 或團隊成員一定有。
+
+例：`` `anthropic-skills:ogg-*` `` 若能匹配
+`anthropic-skills:ogg-generate-ac`、`anthropic-skills:ogg-generate-dod` 等，屬本環境已解析；
+`` `wrong-provider:ogg-*` `` 零匹配時要報外部依賴問題，但不能說 repo 裡有死檔案。
 
 **以下情況不算斷引用，不要報：**
 - 該檔案是**這支 skill 自己會產生**的產出物（`INDEX.md`、`_skeleton.md`、`_sources.md` 這類）
@@ -61,6 +80,12 @@ frontmatter 有沒有 `provenance:`。沒有就報 —— 它決定這支能不�
 ### 🔴 斷引用（N 筆）
 - <skill>/SKILL.md:<行> `<引用>` — 已試過 <路徑1>、<路徑2>… 皆不存在
 
+### 🟡 外部 skill 未安裝／名稱錯誤（N 筆）
+- <skill>/SKILL.md:<行> `<provider:name>` — 當前 runtime catalog 零匹配；已查 <catalog/匹配條件>
+
+### ⚪ 外部依賴未驗證（N 筆）
+- <skill>/SKILL.md:<行> `<provider:name>` — 當前環境無法取得 runtime catalog，未判定存在或缺少
+
 ### 🔴 硬編絕對路徑（N 筆）
 - <skill>/SKILL.md:<行> `<片段>`
 
@@ -76,3 +101,4 @@ frontmatter 有沒有 `provenance:`。沒有就報 —— 它決定這支能不�
 
 **沒問題就寫「N 支全部通過」。不要為了交差硬找東西。**
 **每一筆都要能被主對話用一個指令複驗 —— 附上檔名與行號。**
+若有外部依賴未驗證，不得寫「全部通過」。已解析的 plugin 引用要在摘要註明只代表本環境。

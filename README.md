@@ -95,7 +95,7 @@ claude plugin list
 `one-page-report` 的檢查器從安裝後的位置也跑得起來（exit 0）。
 
 🔴 **順帶修掉一個錯的前提**：實測前，本機註冊的 marketplace 指向
-`/Users/patrick.lee/projects/Patrick-agent` —— **個人 repo，那個絕不能加 collaborator 的**。
+**作者的個人 repo** —— 那個絕不能加 collaborator 的。
 是 2026-08-28 拆 repo 之前的殘留，本機是 `directory` 來源所以沒出事，
 但**團隊化整套設計的第一個前提，在本機設定裡是錯的，而且錯了 7 天沒人發現。**
 

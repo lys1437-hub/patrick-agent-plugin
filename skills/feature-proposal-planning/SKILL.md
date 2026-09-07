@@ -1,10 +1,10 @@
 ---
 name: feature-proposal-planning
 provenance: 自建｜E1–E4 證據分級、Pilot 設計
-version: 0.3.0
+version: 0.3.1
 description: 功能提案規劃與成效檢視。**不用於純數據查詢（改用 igaming-ops-analysis，不在本包）、開發規格、Jira 拆解、簡報美化。** 觸發：「做功能提案」「這功能要不要做」「規劃活動機制」「成效檢視」「health check」。
 user-invocable: true
-last-updated: 2026-08-30
+last-updated: 2026-09-07
 ---
 
 # 功能提案規劃
@@ -25,7 +25,7 @@ last-updated: 2026-08-30
 
 - 只是要查數字或跑分析 → 用 `igaming-ops-analysis`
 - 功能已定案、要寫開發規格 / PRD → 直接寫規格，不需要提案論證
-- 要拆 story、寫 AC / DoD → 用 `ogg-*` 系列（**雇主環境專用，不在本 plugin 內**）
+- 要拆 story、寫 AC / DoD → 用 `anthropic-skills:ogg-*` 系列（**雇主環境專用，不在本 plugin 內**）
 - 一次性的簡報排版美化
 
 ---
