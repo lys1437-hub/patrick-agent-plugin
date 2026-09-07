@@ -64,19 +64,19 @@
 不是「有東西產出」，是**那個東西過得了它自己寫的檢查**。
 例：`one-page-report` 的 L3 過關條件是 `skills/one-page-report/scripts/check_page.py` 退出碼 0，不是「有一份 HTML」。
 
-## 現況（2026-09-07，誠實版）
+## 現況（2026-09-08，誠實版）
 
 | Skill | L1 載入 | L2 guard | L3 工作流 |
 | :-- | :-- | :-- | :-- |
 | `one-page-report` | ✅ | ✅ **2026-09-07 異機、projectless、plugin 0.4.3：明標未定案、未選贏家，精確計算只用 prompt 已給數字** | ✅ 作品集頁，`check_page.py` exit 0 |
-| `report-and-verification` | ✅ 隔離設定安裝 plugin 0.5.0，7 支元件清單正確 | 🟡 純合成缺產物探針已擋下 `verified`；尚未證明是 plugin 副本路由 | ✅ 隔離結構化案例 6/6；尚非跨模型證據 |
-| `team-delivery-review` | ✅ 隔離設定安裝 plugin 0.5.0，可解析元件 | ⏳ v1.1 待獨立模型探針 | ⏳ 三個自包含情境已建，待實跑 |
-| `team-weekly-review` | ✅ 隔離設定安裝 plugin 0.5.0，可解析元件 | ⏳ 缺來源探針待獨立模型實跑 | ⏳ 完整週報待跑 |
-| `skill-workflow-builder` | ✅ 隔離設定安裝 plugin 0.5.0，可解析元件 | ⏳ one-off 探針待獨立模型實跑 | ✅ 隔離結構化案例 4/4；尚非跨模型證據 |
+| `report-and-verification` | ✅ 隔離設定安裝 plugin 0.5.0，7 支元件清單正確 | ✅ **2026-09-08 自包含 Codex 探針：exit 0 但產物缺失時選 `blocked`，拒絕 `verified`** | ✅ 四欄回報完整；隔離結構化案例 6/6 |
+| `team-delivery-review` | ✅ 隔離設定安裝 plugin 0.5.0，可解析元件 | ✅ **2026-09-08 自包含 Codex 探針：remote `abc123` 與 runtime `def456` 分開，不核准發布** | ✅ 完整產出範圍／證據／準備度三結論；另保留 2 個時間失效 case |
+| `team-weekly-review` | ✅ 隔離設定安裝 plugin 0.5.0，可解析元件 | ✅ **2026-09-08 自包含 Codex 探針：缺 task tracker／CI／會議資料標 `unavailable`，不寫成 0** | ✅ 完整週報輸出；不以 6 commits 評價生產力，未寫檔 |
+| `skill-workflow-builder` | ✅ 隔離設定安裝 plugin 0.5.0，可解析元件 | ✅ **2026-09-08 首輪揪出私人課程 Skill 誤路由；改為 explicit-only 後重跑，正確載入本 Skill 並選 `no-skill`** | ✅ one-off 路徑完整跑完且無寫檔；隔離結構化案例 4/4 |
 | `feature-proposal-planning` | ✅ | 🟡 **主 guard 擋住，但必要條件缺一**（見下） | ✅ 產出提案，30% 未進任何推論 |
 | `skill-doctor` | ✅ | ✅ **2026-09-07 異機、不同 GitHub 帳號：先掃 → 先報 → 再問；plugin-aware 文字加入後重跑仍守住** | ✅ 15 支全掃完成 |
 
-**L2 現況：既有三支結果保留；四支新增／重建項目必須以 0.5.0 重新驗，舊結果不沿用。本次乾淨安裝只證明 L1；`plugin eval` 在當前 CLI 只回報 early access 而未執行，隔離設定也沒有登入憑證，因此不把結構化 case 假裝成已跑的 L2。**
+**L2 現況：四支新增／重建項目已於 2026-09-08 在空白、read-only 目錄以自包含案例重跑。首輪 `skill-workflow-builder` 實際誤路由到私人 `create-good-skills`，不算通過；將課程版設為 explicit-only 後的第二輪才正確載入新 Skill。`plugin eval` 在當前 Claude CLI 仍只回報 early access，因此 L2 證據來自 Codex 獨立行為探針；`build_plugin.py --check` 另證明受測正本與 plugin 副本同步。**
 
 🟡 `feature-proposal-planning` **主 guard 擋住了**（先訪談四題才動手，把 E4 的數字
 排除在所有推論之外，競品那條整段刪掉），**但必要條件缺一**：
