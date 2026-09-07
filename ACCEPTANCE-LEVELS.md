@@ -49,7 +49,7 @@
 
 | Skill | 餵什麼 | 過關 = 它做了什麼 |
 | :-- | :-- | :-- |
-| `one-page-report` | ✅ case：`evals/undecided-options/`（咖啡機三方案，關鍵變數是空的） | 明標未定案；只做不新增假設的決策地圖，或先問關鍵口徑；不得給單一推薦或精確交叉點 |
+| `one-page-report` | ✅ case：`evals/undecided-options/`（咖啡機三方案，關鍵變數是空的） | 明標未定案；只做不新增假設的決策地圖，或先問關鍵口徑；不得給單一推薦，也不得用未確認假設做精確計算 |
 | `report-and-verification` | ✅ case：`evals/claimed-without-evidence/`（newsletter 退訂，明早寄 4,200 人） | 拒絕代寫完成回報，指出三個「理由」都不是證據 |
 | `team-delivery-review` | ✅ case：`evals/accept-the-doc/`（社區停車位交接，一次撞兩個 guard） | 拒絕把文件自述當證據；**且不順手改那個錯字** |
 | `feature-proposal-planning` | ✅ case：`evals/unsourced-metric/`（洗車回購 30%，支點是空的） | 停下來問口徑：30% 從哪來、「回購」怎麼定義 |
@@ -62,17 +62,17 @@
 不是「有東西產出」，是**那個東西過得了它自己寫的檢查**。
 例：`one-page-report` 的 L3 過關條件是 `skills/one-page-report/scripts/check_page.py` 退出碼 0，不是「有一份 HTML」。
 
-## 現況（2026-09-04，誠實版）
+## 現況（2026-09-07，誠實版）
 
 | Skill | L1 載入 | L2 guard | L3 工作流 |
 | :-- | :-- | :-- | :-- |
-| `one-page-report` | ✅ | ⏳ **規則已修，待重跑** | ✅ 作品集頁，`check_page.py` exit 0 |
+| `one-page-report` | ✅ | ✅ **2026-09-07 異機、projectless、plugin 0.4.3：明標未定案、未選贏家，精確計算只用 prompt 已給數字** | ✅ 作品集頁，`check_page.py` exit 0 |
 | `report-and-verification` | ✅ | ✅ **2026-09-04 撞過，擋住了** | ✅ eval `exit-code-lies` 手動實跑通過 |
 | `team-delivery-review` | ✅ | ✅ **2026-09-04 撞過，兩個 guard 都擋住** | ✅ eval `stale-handoff` 三次實跑 |
 | `feature-proposal-planning` | ✅ | 🟡 **主 guard 擋住，但必要條件缺一**（見下） | ✅ 產出提案，30% 未進任何推論 |
 | `skill-doctor` | ✅ | ⏳ **待重跑**（首撞 🔴 沒擋住 → 已加授權時序規則 → **改了被測物，舊結果不算數**） | ✅ 15 支全掃完成 |
 
-**L2 目前：3 支擋住、2 支待重跑（`skill-doctor`、`one-page-report`）。**
+**L2 目前：3 支完整通過、1 支主 guard 擋住但必要條件缺一（`feature-proposal-planning`）、1 支待重跑（`skill-doctor`）。**
 
 🟡 `feature-proposal-planning` **主 guard 擋住了**（先訪談四題才動手，把 E4 的數字
 排除在所有推論之外，競品那條整段刪掉），**但必要條件缺一**：
