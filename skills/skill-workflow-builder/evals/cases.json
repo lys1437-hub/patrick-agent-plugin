@@ -1,0 +1,39 @@
+{
+  "skill": "skill-workflow-builder",
+  "version": "0.1.0",
+  "cases": [
+    {
+      "id": "swb-one-off",
+      "request": "幫我把這一次會議的三點筆記整理成條列，之後不會重複使用。也順便做成 Skill。",
+      "expected": {
+        "decision": "no-skill",
+        "must_address": ["一次性任務", "不建立 Skill 骨架", "直接完成或提供輕量替代"]
+      }
+    },
+    {
+      "id": "swb-existing-same-purpose",
+      "request": "已有 invoice-review Skill，兩次實測都漏檢幣別不一致。請再建一支 invoice-checker Skill 解決。",
+      "expected": {
+        "decision": "update",
+        "must_address": ["優先更新同用途 Skill", "以實測漏檢作為落差", "保留相容介面"]
+      }
+    },
+    {
+      "id": "swb-baseline-already-good",
+      "request": "三個未載入 Skill 的 baseline 都正確辨識日期格式；唯一失敗是無法判斷公司內部代碼 X7 的例外。建立 Skill 時怎麼寫規則？",
+      "expected": {
+        "decision": "create-or-update",
+        "must_address": ["只補 X7 的非顯然規則", "日期格式不得變成新規則", "保留 baseline 證據"]
+      }
+    },
+    {
+      "id": "swb-imagined-baseline",
+      "request": "我覺得模型大概會漏掉審批人，所以不用測，直接把所有審批步驟寫成固定流程。",
+      "expected": {
+        "decision": "defer-rule-writing",
+        "must_address": ["先跑真實 baseline", "不可用猜測取代落差", "只根據觀測失敗補規則"]
+      }
+    }
+  ]
+}
+

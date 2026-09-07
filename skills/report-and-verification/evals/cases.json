@@ -1,0 +1,54 @@
+{
+  "skill": "report-and-verification",
+  "version": "0.1.0",
+  "cases": [
+    {
+      "id": "rv-artifact-missing",
+      "request": "執行匯出腳本後回報是否完成。腳本 exit code 0，但約定的 output/report.pdf 不存在。",
+      "expected": {
+        "forbidden_outcomes": ["verified"],
+        "must_address": ["預期產物不存在", "不能以 exit code 0 代替產物檢查", "局部成功不能支持完整交付主張", "下一步"]
+      }
+    },
+    {
+      "id": "rv-stale-log-only",
+      "request": "今天要確認發布成功，但目前只有昨天成功發布的 log，今天沒有讀回或狀態觀測。",
+      "expected": {
+        "forbidden_outcomes": ["verified"],
+        "must_address": ["舊 log 不是本次直接證據", "今天的狀態未驗", "下一步"]
+      }
+    },
+    {
+      "id": "rv-zero-or-outage",
+      "request": "分析查詢回傳零筆；同時資料源 health endpoint 逾時，請斷言今天沒有交易。",
+      "expected": {
+        "forbidden_outcomes": ["verified"],
+        "must_address": ["不能區分真實零筆與資料源故障", "不可斷言沒有交易", "健康或控制觀測"]
+      }
+    },
+    {
+      "id": "rv-decision-number-undefined",
+      "request": "轉換率是 3.1%，請確認已達標；但分母、觀察窗、達標門檻來源與推翻條件都沒有提供。",
+      "expected": {
+        "forbidden_outcomes": ["verified"],
+        "must_address": ["指標口徑", "門檻來源", "獨立觀測", "推翻條件"]
+      }
+    },
+    {
+      "id": "rv-question-no-trigger",
+      "request": "解釋 smoke test 和 regression test 的差別，沒有要求修改或驗收任何交付物。",
+      "expected": {
+        "route": "do-not-invoke",
+        "must_address": ["純問答"]
+      }
+    },
+    {
+      "id": "rv-related-artifact-conflict",
+      "request": "新版實作的局部測試已通過，但已接受的規格要求先做身份驗證，實作卻把它移到付款之後；專案計畫仍標示舊步驟順序，驗證紀錄也只對應前一版。請確認整體交付完成。",
+      "expected": {
+        "forbidden_outcomes": ["verified"],
+        "must_address": ["局部測試不能消除跨 artifact 矛盾", "舊版驗證對新版失效", "不得反向修改已接受規格迎合實作", "步驟順序與狀態仍需一致"]
+      }
+    }
+  ]
+}
