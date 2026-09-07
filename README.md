@@ -87,10 +87,10 @@ claude plugin marketplace add lys1437-hub/patrick-agent-plugin
 claude plugin install patrick-agent@patrick-agent-marketplace
   → ✔ Successfully installed (scope: user)
 claude plugin list
-  → patrick-agent@patrick-agent-marketplace  0.4.2  ✔ enabled
+  → patrick-agent@patrick-agent-marketplace  0.4.3  ✔ enabled
 ```
 
-安裝結果落在 `~/.claude/plugins/cache/.../0.4.2`，**釘住 `gitCommitSha（安裝當下的版本，`claude plugin list` 可查）），
+安裝結果落在 `~/.claude/plugins/cache/.../0.4.3`，**釘住 `gitCommitSha（安裝當下的版本，`claude plugin list` 可查）），
 5 支 skill ＋ `TEAM_RULES.md` ＋ `WHY-THESE-RULES.md` 都在，
 `one-page-report` 的檢查器從安裝後的位置也跑得起來（exit 0）。
 
