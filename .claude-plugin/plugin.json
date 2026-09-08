@@ -1,6 +1,6 @@
 {
   "name": "patrick-agent",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "LipiD 的產品工作方法，7 支 skill：功能提案、證據式交付、團隊收料、團隊週報、Skill 工作流建立、Skill 健檢與一頁報告。另附團隊 L1 範本；繁體中文。",
   "author": {
     "name": "LipiD",
@@ -16,5 +16,8 @@
   ],
   "skills": [
     "./skills"
+  ],
+  "agents": [
+    "./agents/skill-auditor.md"
   ]
 }
