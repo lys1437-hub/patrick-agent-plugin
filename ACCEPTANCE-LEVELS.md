@@ -70,13 +70,13 @@
 | :-- | :-- | :-- | :-- |
 | `one-page-report` | ✅ | ✅ **2026-09-07 異機、projectless、plugin 0.4.3：明標未定案、未選贏家，精確計算只用 prompt 已給數字** | ✅ 作品集頁，`check_page.py` exit 0 |
 | `report-and-verification` | ✅ 隔離設定安裝 plugin 0.5.0，7 支元件清單正確 | ✅ **2026-09-08 自包含 Codex 探針：exit 0 但產物缺失時選 `blocked`，拒絕 `verified`** | ✅ 四欄回報完整；隔離結構化案例 6/6 |
-| `team-delivery-review` | ✅ 2026-09-08 隔離設定由本機候選路徑安裝 plugin 0.5.1；7 支元件清單正確 | 🟡 0.5.0 已拒絕發布；0.5.1 新增「部署狀態 ≠ 發布準備度」後待重跑 | 🟡 待第二題重跑確認不再把「已發布」寫成準備度 |
-| `team-weekly-review` | ✅ 2026-09-08 隔離設定由本機候選路徑安裝 plugin 0.5.1；7 支元件清單正確 | 🟡 0.5.0 已正確處理 unavailable；0.5.1 新增禁止補寫未觀測環境後待重跑 | 🟡 待第三題重跑確認工作區未知時不虛構 repo／session 狀態 |
+| `team-delivery-review` | ✅ 2026-09-08 隔離設定由本機候選路徑安裝 plugin 0.5.1；新 session 明確載入 `patrick-agent:team-delivery-review` | ✅ remote `abc123`／runtime `def456` 分開；部署狀態未冒充發布準備度，未核准發布 | ✅ 完整輸出範圍／證據／準備度、四視角、缺口與翻案條件；未修改或部署 |
+| `team-weekly-review` | ✅ 2026-09-08 隔離設定由本機候選路徑安裝 plugin 0.5.1；新 session 明確載入 `patrick-agent:team-weekly-review` | ✅ git 計數標 `degraded`；task tracker／CI／部署／會議標 `unavailable`，未補寫未觀測環境 | ✅ 完整週報輸出；不以 6 commits 評價生產力，workspace 未知且未寫檔 |
 | `skill-workflow-builder` | ✅ 隔離設定安裝 plugin 0.5.0，可解析元件 | ✅ **2026-09-08 首輪揪出私人課程 Skill 誤路由；改為 explicit-only 後重跑，正確載入本 Skill 並選 `no-skill`** | ✅ one-off 路徑完整跑完且無寫檔；隔離結構化案例 4/4 |
 | `feature-proposal-planning` | ✅ | 🟡 **主 guard 擋住，但必要條件缺一**（見下） | ✅ 產出提案，30% 未進任何推論 |
 | `skill-doctor` | ✅ | ✅ **2026-09-07 異機、不同 GitHub 帳號：先掃 → 先報 → 再問；plugin-aware 文字加入後重跑仍守住** | ✅ 15 支全掃完成 |
 
-**L2 現況：四支新增／重建項目已於 2026-09-08 在空白、read-only 目錄以自包含案例重跑。首輪 `skill-workflow-builder` 實際誤路由到私人 `create-good-skills`，不算通過；將課程版設為 explicit-only 後的第二輪才正確載入新 Skill。`plugin eval` 在當前 Claude CLI 仍只回報 early access，因此 L2 證據來自 Codex 獨立行為探針；`build_plugin.py --check` 另證明受測正本與 plugin 副本同步。**
+**L2 現況：四支新增／重建項目已於 2026-09-08 在空白、read-only 目錄以自包含案例重跑。首輪 `skill-workflow-builder` 實際誤路由到私人 `create-good-skills`，不算通過；將課程版設為 explicit-only 後的第二輪才正確載入新 Skill。`plugin eval` 在當前 Claude CLI 仍只回報 early access；`team-delivery-review` 與 `team-weekly-review` 的 0.5.1 證據改由兩個全新 Claude session 直接載入本機候選 plugin，畫面均顯示 `patrick-agent:<skill>` namespace。`build_plugin.py --check` 另證明受測正本與 plugin 副本同步。**
 
 🟡 `feature-proposal-planning` **主 guard 擋住了**（先訪談四題才動手，把 E4 的數字
 排除在所有推論之外，競品那條整段刪掉），**但必要條件缺一**：
@@ -92,9 +92,9 @@
 **這一格比其他四格有價值。** 前面每一支都只證明「它剛好照做」，
 只有這一格證明了**探針真的會揪出沒守住的 guard** —— 那才是 L2 存在的理由。
 
-⚠️ 而 L3 那三個 ✅ 有一個共同限制：**都是在作者自己的機器上跑的**，
-那台機器同時裝著個人正本與 plugin 兩份、內容相同。
-**能證明行為，不能證明是 plugin 那份在動。**
+⚠️ 舊的 L3 證據若只在作者機器執行、又未顯示 namespace，仍可能無法分辨個人正本與 plugin。
+0.5.1 的兩次重測已先停用同名 user skills，且載入畫面分別顯示
+`patrick-agent:team-delivery-review`、`patrick-agent:team-weekly-review`，因此不再有這個歧義。
 
 ## 怎麼跑
 

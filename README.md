@@ -2,8 +2,6 @@
 
 LipiD 的產品工作方法 skill 包，給 Claude Code 用。
 
-目前 manifest：`0.5.1` 候選版；第二、三題完成 Claude 新 session 重測後才發布。
-
 ## 安裝
 
 ```bash
