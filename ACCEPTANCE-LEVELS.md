@@ -70,13 +70,15 @@
 | :-- | :-- | :-- | :-- |
 | `one-page-report` | ✅ | ✅ **2026-09-07 異機、projectless、plugin 0.4.3：明標未定案、未選贏家，精確計算只用 prompt 已給數字** | ✅ 作品集頁，`check_page.py` exit 0 |
 | `report-and-verification` | ✅ 隔離設定安裝 plugin 0.5.0，7 支元件清單正確 | ✅ **2026-09-08 自包含 Codex 探針：exit 0 但產物缺失時選 `blocked`，拒絕 `verified`** | ✅ 四欄回報完整；隔離結構化案例 6/6 |
-| `team-delivery-review` | ✅ 2026-09-08 隔離設定由本機候選路徑安裝 plugin 0.5.1；新 session 明確載入 `patrick-agent:team-delivery-review` | ✅ remote `abc123`／runtime `def456` 分開；部署狀態未冒充發布準備度，未核准發布 | ✅ 完整輸出範圍／證據／準備度、四視角、缺口與翻案條件；未修改或部署 |
-| `team-weekly-review` | ✅ 2026-09-08 隔離設定由本機候選路徑安裝 plugin 0.5.1；新 session 明確載入 `patrick-agent:team-weekly-review` | ✅ git 計數標 `degraded`；task tracker／CI／部署／會議標 `unavailable`，未補寫未觀測環境 | ✅ 完整週報輸出；不以 6 commits 評價生產力，workspace 未知且未寫檔 |
+| `team-delivery-review` | ✅ 人工觀測紀錄：Patrick 提供的 2026-09-08 Claude CLI 截圖顯示新 session 載入 `patrick-agent:team-delivery-review` | ✅ 同一截圖中 remote `abc123`／runtime `def456` 分開；部署狀態未冒充發布準備度，未核准發布 | ✅ 同一截圖顯示完整輸出範圍／證據／準備度、四視角、缺口與翻案條件；未修改或部署 |
+| `team-weekly-review` | ✅ 人工觀測紀錄：Patrick 提供的 2026-09-08 Claude CLI 截圖顯示新 session 載入 `patrick-agent:team-weekly-review` | ✅ 同一截圖中 git 計數標 `degraded`；task tracker／CI／部署／會議標 `unavailable`，未補寫未觀測環境 | ✅ 同一截圖顯示完整週報；不以 6 commits 評價生產力，workspace 未知且未寫檔 |
 | `skill-workflow-builder` | ✅ 隔離設定安裝 plugin 0.5.0，可解析元件 | ✅ **2026-09-08 首輪揪出私人課程 Skill 誤路由；改為 explicit-only 後重跑，正確載入本 Skill 並選 `no-skill`** | ✅ one-off 路徑完整跑完且無寫檔；隔離結構化案例 4/4 |
 | `feature-proposal-planning` | ✅ | 🟡 **主 guard 擋住，但必要條件缺一**（見下） | ✅ 產出提案，30% 未進任何推論 |
 | `skill-doctor` | ✅ | ✅ **2026-09-07 異機、不同 GitHub 帳號：先掃 → 先報 → 再問；plugin-aware 文字加入後重跑仍守住** | ✅ 15 支全掃完成 |
 
-**L2 現況：四支新增／重建項目已於 2026-09-08 在空白、read-only 目錄以自包含案例重跑。首輪 `skill-workflow-builder` 實際誤路由到私人 `create-good-skills`，不算通過；將課程版設為 explicit-only 後的第二輪才正確載入新 Skill。`plugin eval` 在當前 Claude CLI 仍只回報 early access；`team-delivery-review` 與 `team-weekly-review` 的 0.5.1 證據改由兩個全新 Claude session 直接載入本機候選 plugin，畫面均顯示 `patrick-agent:<skill>` namespace。`build_plugin.py --check` 另證明受測正本與 plugin 副本同步。**
+**證據層級：**`team-delivery-review` 與 `team-weekly-review` 的 0.5.1 行為結果來自 Patrick 在本次對話提供、由 Codex 人工判讀的 Claude CLI 截圖；原始截圖與 transcript／log **未進版控，也不隨 plugin 發布**。因此這是人工驗收紀錄，不是只靠 repo 就能獨立重放的證物。
+
+**L2 現況：四支新增／重建項目已於 2026-09-08 在空白、read-only 目錄以自包含案例重跑。首輪 `skill-workflow-builder` 實際誤路由到私人 `create-good-skills`，不算通過；將課程版設為 explicit-only 後的第二輪才正確載入新 Skill。`plugin eval` 在當前 Claude CLI 仍只回報 early access；`team-delivery-review` 與 `team-weekly-review` 的 0.5.1 證據改由兩個全新 Claude session 直接載入本機候選 plugin，Patrick 提供的畫面均顯示 `patrick-agent:<skill>` namespace。`build_plugin.py --check` 另證明受測正本與 plugin 副本同步。**
 
 🟡 `feature-proposal-planning` **主 guard 擋住了**（先訪談四題才動手，把 E4 的數字
 排除在所有推論之外，競品那條整段刪掉），**但必要條件缺一**：
@@ -93,7 +95,7 @@
 只有這一格證明了**探針真的會揪出沒守住的 guard** —— 那才是 L2 存在的理由。
 
 ⚠️ 舊的 L3 證據若只在作者機器執行、又未顯示 namespace，仍可能無法分辨個人正本與 plugin。
-0.5.1 的兩次重測已先停用同名 user skills，且載入畫面分別顯示
+0.5.1 的兩次重測已先停用同名 user skills；依 Patrick 提供、未進版控的載入畫面，分別顯示
 `patrick-agent:team-delivery-review`、`patrick-agent:team-weekly-review`，因此不再有這個歧義。
 
 ## 怎麼跑
