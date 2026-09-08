@@ -1,6 +1,6 @@
 {
   "name": "patrick-agent-marketplace",
-  "description": "LipiD 的產品工作方法 skill 包，以及一份團隊 L1 範本（TEAM_RULES.md）。內容由 build_plugin.py 產生，不要直接編輯 skills/。另收錄指向上游的 plugin —— 那些是別人的作品，這裡只給地址並釘住版本。",
+  "description": "LipiD 的產品工作方法 skill 包，以及一份團隊協作規則範本（TEAM_RULES.md）。內容由 build_plugin.py 產生，不要直接編輯 skills/。另收錄指向上游的 plugin —— 那些是別人的作品，這裡只給地址並釘住版本。",
   "owner": {
     "name": "LipiD"
   },
