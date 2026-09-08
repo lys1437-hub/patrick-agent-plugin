@@ -4,19 +4,63 @@ LipiD 的產品工作方法 skill 包，給 Claude Code 用。
 
 ## 安裝
 
+### 0. 前置條件（三項，缺一個就裝不起來）
+
+> 🔴 **這一節是 2026-09-07 在一台乾淨機器上實測補的。**
+> 原本的安裝說明是從「已經有 Claude Code」開始寫的 ——
+> 因為寫的人機器上早就有了。**走到第三步才發現撞到三個沒寫的東西。**
+
+**① 你的 GitHub 帳號要先被邀請成這個 repo 的 collaborator。**
+這是私有 repo，沒有權限時 GitHub 回的是 **404 不是 403** ——
+錯誤訊息會看起來像「repo 不存在」，而不是「你沒有權限」。
+
+確認你是用哪個帳號：
+
+```bash
+gh auth status
+```
+
+**② 要有 Node.js 與 Claude Code CLI。**
+
+```bash
+npm install -g @anthropic-ai/claude-code
+claude --version
+```
+
+⚠️ **一定要 CLI。** 桌面版沒有 `/plugin`，實測回 `isn't available in this environment`。
+**但 CLI 裝完之後桌面版讀得到**（2026-09-07 實測，兩邊都看得見），
+所以「用 CLI 裝、平常用桌面版」是可行的。
+
+**③ 要登入 GitHub。** clone 走 HTTPS，用的是這台機器的 git 認證：
+
+```bash
+gh auth login
+```
+
+### 1. 裝
+
 ```bash
 claude plugin marketplace add lys1437-hub/patrick-agent-plugin
 claude plugin install patrick-agent@patrick-agent-marketplace
+claude plugin list
 ```
 
+最後一行要看到版本號與 `enabled`。
+
 **裝完要開一個新對話**才會載入 —— Claude Code 是在對話開始時讀 skill 清單。
+
+### 2. 確認它真的能用
+
+裝得起來 ≠ 能用。三層驗收見 **`ACCEPTANCE-LEVELS.md`**，
+最少做第一層：打 `/patrick-agent` 看五支在不在。
 
 ## 裝完之後怎麼用
 
 **你不會「呼叫」什麼。** 裝好之後，你的 Claude 就懂這套方法了 ——
 講到「做功能提案」「這功能要不要做」「規劃活動機制」「成效檢視」時它會自己套用。
 
-也可以直接打 `/<skill-name>` 明確指定。
+也可以直接打 `/patrick-agent:<skill-name>` 明確指定。
+⚠️ **前綴不能省** —— 打裸名叫不出來。
 
 ## 目前內容
 
