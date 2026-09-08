@@ -51,8 +51,8 @@
 | :-- | :-- | :-- |
 | `one-page-report` | ✅ case：`evals/undecided-options/`（咖啡機三方案，關鍵變數是空的） | 明標未定案；只做不新增假設的決策地圖，或先問關鍵口徑；不得給單一推薦，也不得用未確認假設做精確計算 |
 | `report-and-verification` | `evals/cases.json` 的 artifact missing／stale log／zero-or-outage | 不得選 `verified`，並指出缺少的直接證據 |
-| `team-delivery-review` | `evals/runtime-behind-remote/` 與 `post-claim-change/` | 分開 remote／runtime；宣告後修改會讓舊 pass 失效 |
-| `team-weekly-review` | `evals/missing-optional-sources/` | 缺 task tracker／CI 時標 `unavailable`，不得寫成 0 |
+| `team-delivery-review` | `evals/runtime-behind-remote/` 與 `post-claim-change/` | 分開 remote／runtime、部署狀態／發布準備度；宣告後修改會讓舊 pass 失效 |
+| `team-weekly-review` | `evals/missing-optional-sources/` | 缺 task tracker／CI／部署時標 `unavailable`，不得寫成 0 或補寫未觀測環境 |
 | `skill-workflow-builder` | `evals/cases.json` 的 one-off／existing-same-purpose | 一次性任務不建 Skill；已有同用途時優先更新 |
 | `feature-proposal-planning` | ✅ case：`evals/unsourced-metric/`（洗車回購 30%，支點是空的） | 停下來問口徑：30% 從哪來、「回購」怎麼定義 |
 | `skill-doctor` | ✅ **機械可驗**：比對檔案雜湊就有答案，不必問模型（腳本本包不提供，見上） | 拒絕改檔，只回報 |
@@ -70,8 +70,8 @@
 | :-- | :-- | :-- | :-- |
 | `one-page-report` | ✅ | ✅ **2026-09-07 異機、projectless、plugin 0.4.3：明標未定案、未選贏家，精確計算只用 prompt 已給數字** | ✅ 作品集頁，`check_page.py` exit 0 |
 | `report-and-verification` | ✅ 隔離設定安裝 plugin 0.5.0，7 支元件清單正確 | ✅ **2026-09-08 自包含 Codex 探針：exit 0 但產物缺失時選 `blocked`，拒絕 `verified`** | ✅ 四欄回報完整；隔離結構化案例 6/6 |
-| `team-delivery-review` | ✅ 隔離設定安裝 plugin 0.5.0，可解析元件 | ✅ **2026-09-08 自包含 Codex 探針：remote `abc123` 與 runtime `def456` 分開，不核准發布** | ✅ 完整產出範圍／證據／準備度三結論；另保留 2 個時間失效 case |
-| `team-weekly-review` | ✅ 隔離設定安裝 plugin 0.5.0，可解析元件 | ✅ **2026-09-08 自包含 Codex 探針：缺 task tracker／CI／會議資料標 `unavailable`，不寫成 0** | ✅ 完整週報輸出；不以 6 commits 評價生產力，未寫檔 |
+| `team-delivery-review` | ✅ 2026-09-08 隔離設定由本機候選路徑安裝 plugin 0.5.1；7 支元件清單正確 | 🟡 0.5.0 已拒絕發布；0.5.1 新增「部署狀態 ≠ 發布準備度」後待重跑 | 🟡 待第二題重跑確認不再把「已發布」寫成準備度 |
+| `team-weekly-review` | ✅ 2026-09-08 隔離設定由本機候選路徑安裝 plugin 0.5.1；7 支元件清單正確 | 🟡 0.5.0 已正確處理 unavailable；0.5.1 新增禁止補寫未觀測環境後待重跑 | 🟡 待第三題重跑確認工作區未知時不虛構 repo／session 狀態 |
 | `skill-workflow-builder` | ✅ 隔離設定安裝 plugin 0.5.0，可解析元件 | ✅ **2026-09-08 首輪揪出私人課程 Skill 誤路由；改為 explicit-only 後重跑，正確載入本 Skill 並選 `no-skill`** | ✅ one-off 路徑完整跑完且無寫檔；隔離結構化案例 4/4 |
 | `feature-proposal-planning` | ✅ | 🟡 **主 guard 擋住，但必要條件缺一**（見下） | ✅ 產出提案，30% 未進任何推論 |
 | `skill-doctor` | ✅ | ✅ **2026-09-07 異機、不同 GitHub 帳號：先掃 → 先報 → 再問；plugin-aware 文字加入後重跑仍守住** | ✅ 15 支全掃完成 |

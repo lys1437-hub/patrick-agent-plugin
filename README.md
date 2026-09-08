@@ -2,6 +2,8 @@
 
 LipiD 的產品工作方法 skill 包，給 Claude Code 用。
 
+目前 manifest：`0.5.1` 候選版；第二、三題完成 Claude 新 session 重測後才發布。
+
 ## 安裝
 
 ```bash
@@ -24,8 +26,8 @@ claude plugin install patrick-agent@patrick-agent-marketplace
 |---|---|
 | `feature-proposal-planning` | 功能提案規劃與成效檢視。含 E1–E4 證據分級、Pilot 實驗設計（樣本數／MDE／guardrail／事前定義 win-lose-inconclusive） |
 | `report-and-verification` | 實際交付與決策數字的完成閘門；以 outcome、當次證據、未驗範圍及下一步回報 |
-| `team-delivery-review` | 驗收別人的完成宣告，分開 workspace、commit、remote 與 runtime |
-| `team-weekly-review` | 從可取得來源整理團隊週報，缺來源標 unavailable，不把 commit 數當績效 |
+| `team-delivery-review` | 驗收別人的完成宣告，分開 workspace、commit、remote、runtime、部署狀態與發布準備度 |
+| `team-weekly-review` | 從可取得來源整理團隊週報，缺來源標 unavailable，不把 commit 數當績效，也不補寫未觀測環境 |
 | `skill-workflow-builder` | 以 baseline 與 forward test 建立或更新最小 Skill；一次性任務不硬建 |
 | `skill-doctor` | 唯讀掃描 Skill 的斷引用、路徑耦合、description 截斷與 provenance |
 | `one-page-report` | 產出單檔、自包含、可列印的一頁報告，並附交付前檢查器 |
@@ -93,10 +95,10 @@ claude plugin marketplace add lys1437-hub/patrick-agent-plugin
 claude plugin install patrick-agent@patrick-agent-marketplace
   → ✔ Successfully installed (scope: user)
 claude plugin list
-  → patrick-agent@patrick-agent-marketplace  0.5.0  ✔ enabled
+  → patrick-agent@patrick-agent-marketplace  <installed-version>  ✔ enabled
 ```
 
-安裝結果落在 `~/.claude/plugins/cache/.../0.5.0`，**釘住 `gitCommitSha`（安裝當下的版本，`claude plugin list` 可查）**；
+安裝結果落在 `~/.claude/plugins/cache/.../<installed-version>`，**釘住 `gitCommitSha`（安裝當下的版本，`claude plugin list` 可查）**；
 7 支 skill ＋ `TEAM_RULES.md` ＋ `WHY-THESE-RULES.md` 都在，
 `one-page-report` 的檢查器從安裝後的位置也跑得起來（exit 0）。
 

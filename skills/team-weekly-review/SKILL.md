@@ -2,7 +2,7 @@
 name: team-weekly-review
 description: "整理團隊一週的交付、進行中、決策與風險，附來源和觀測盲區。**不用於個人記憶健檢、績效評分或只查單一任務進度。**"
 metadata:
-  version: 0.1.0
+  version: 0.1.1
   provenance: 自建｜從跨工作區交付、來源缺漏與週報證據失效案例建立
 ---
 
@@ -25,6 +25,10 @@ metadata:
 
 每個來源標示 `available`、`degraded` 或 `unavailable`。缺少可選來源不等於 0 件工作，也不能推論沒有風險。
 無法 fetch 時，只能描述本機 remote-tracking ref，不得宣稱遠端最新。
+
+若使用者提供自包含資料或禁止檢查環境，只使用明確提供的事實；必要 git 來源依實際提供範圍標成
+`degraded` 或 `unavailable`。不得自行補寫目前目錄是否為 repo、是不是暫存工作區、是否位於正確專案、
+有沒有 fetch、branch／HEAD 或 session 狀態。報告中的「工作區」沒有名稱或路徑證據時寫 `unavailable`。
 
 ## 建立證據帳
 
@@ -70,6 +74,7 @@ metadata:
 - commit 數是活動量，不是價值、生產力或成員績效。
 - 沒有 log 只能說該時間看不到，不能說沒工作。
 - 多個來源一致仍可能共用同一個錯誤前提；重要狀態要看產物或 runtime。
+- 不把未提供、未觀測的 workspace／repo／fetch／session 狀態補成背景事實。
 - 不寫入對話原文、憑證或不必要的個人資料。
 
 ## 寫檔規則
@@ -81,6 +86,7 @@ metadata:
 - 時間窗、時區、工作區與來源狀態完整。
 - 可選來源缺失顯示 `unavailable`，沒有寫成 0。
 - local、remote、runtime 分開描述。
+- 工作區與 git 狀態只來自使用者提供或本次直接觀測；未知時不猜。
 - 完成主張附直接證據，舊 pending 經現況重查。
 - 下週重點不超過三件且有依據。
 - 未經指定沒有寫檔或更新外部系統。
