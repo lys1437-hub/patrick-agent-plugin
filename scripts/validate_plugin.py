@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -37,6 +38,7 @@ ALLOWED_EXACT_FILES = REQUIRED_FILES | {
 ALLOWED_SUFFIXES = {".md", ".json", ".py", ".html", ".toml", ".yaml", ".yml", ".txt", ".csv"}
 FORBIDDEN_DIRECTORIES = {"data", "dataset", "corpus", "index", "indexes", "cache", ".cache", ".venv", "venv", "node_modules", "__pycache__"}
 FORBIDDEN_SUFFIXES = {".db", ".sqlite", ".faiss", ".npy", ".npz", ".pkl", ".pickle", ".pt", ".onnx", ".bin"}
+ALLOWED_PLUGIN_FIELDS = {"name", "version", "description", "author", "keywords", "skills", "agents"}
 
 
 def load_json(root: Path, relative_path: str, problems: list[str]) -> dict | None:
@@ -56,6 +58,8 @@ def load_json(root: Path, relative_path: str, problems: list[str]) -> dict | Non
 
 
 def check_manifest_paths(root: Path, plugin: dict, marketplace: dict, problems: list[str]) -> None:
+    for key in sorted(set(plugin) - ALLOWED_PLUGIN_FIELDS):
+        problems.append(f"unsupported plugin.json field: {key}")
     if plugin.get("name") != "patrick-agent":
         problems.append("plugin.json name must be 'patrick-agent'")
     expected_paths = {"skills": ["./skills"], "agents": ["./agents/skill-auditor.md"]}
@@ -92,14 +96,22 @@ def check_manifest_paths(root: Path, plugin: dict, marketplace: dict, problems: 
         if not isinstance(entry, dict):
             problems.append("marketplace.json plugins entries must be objects")
             continue
-        source = entry.get("source")
-        if not isinstance(source, str):
-            continue  # External plugin sources are deliberately not local payload paths.
-        local_plugins.append(entry)
-        if source != "./":
-            problems.append(f"marketplace.json has an unsupported local source: {source!r}")
-        elif not (root / ".claude-plugin" / "plugin.json").is_file():
-            problems.append("marketplace.json root source is missing .claude-plugin/plugin.json")
+        name, source = entry.get("name"), entry.get("source")
+        if not isinstance(name, str) or not name:
+            problems.append("marketplace.json plugin entry must have a non-empty name")
+            continue
+        if isinstance(source, str):
+            local_plugins.append(entry)
+            if source != "./":
+                problems.append(f"marketplace.json has an unsupported local source: {source!r}")
+            elif not (root / ".claude-plugin" / "plugin.json").is_file():
+                problems.append("marketplace.json root source is missing .claude-plugin/plugin.json")
+            continue
+        if not isinstance(source, dict):
+            problems.append("marketplace.json external source must be a GitHub source object")
+            continue
+        if source.get("source") != "github" or not isinstance(source.get("repo"), str) or not re.fullmatch(r"[0-9a-f]{40}", source.get("sha", "")):
+            problems.append("marketplace.json external source must have github, repo, and a 40-character SHA")
     if len(local_plugins) != 1 or local_plugins[0].get("name") != "patrick-agent" or local_plugins[0].get("source") != "./":
         problems.append("marketplace.json must declare exactly one patrick-agent plugin with source './'")
 
@@ -116,9 +128,12 @@ def is_allowed(relative: Path) -> bool:
 def check_payload(root: Path, problems: list[str]) -> None:
     total_size = 0
     for path in sorted(root.rglob("*")):
-        if ".git" in path.parts:
-            continue
         relative = path.relative_to(root)
+        if relative.parts and relative.parts[0] == ".git":
+            continue
+        if ".git" in relative.parts:
+            problems.append(f"nested .git directory is not allowed in payload: {relative.as_posix()}")
+            continue
         if path.is_symlink():
             problems.append(f"symbolic link is not allowed in payload: {relative.as_posix()}")
             continue

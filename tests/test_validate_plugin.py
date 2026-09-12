@@ -171,6 +171,41 @@ class PluginValidationTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("skills/one-page-report/SKILL.md", result.stderr)
 
+    def test_nested_git_directory_is_not_ignored(self) -> None:
+        root = self.make_plugin()
+        nested_git = root / "portfolio" / "example" / ".git"
+        nested_git.mkdir(parents=True)
+        (nested_git / "index.faiss").write_bytes(b"forbidden")
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("nested .git", result.stderr)
+
+    def test_plugin_manifest_rejects_unsupported_components(self) -> None:
+        root = self.make_plugin()
+        plugin_path = root / ".claude-plugin" / "plugin.json"
+        plugin = json.loads(plugin_path.read_text(encoding="utf-8"))
+        plugin["commands"] = ["./../outside"]
+        plugin_path.write_text(json.dumps(plugin), encoding="utf-8")
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unsupported plugin.json field", result.stderr)
+
+    def test_marketplace_rejects_invalid_external_source(self) -> None:
+        root = self.make_plugin()
+        marketplace_path = root / ".claude-plugin" / "marketplace.json"
+        marketplace = json.loads(marketplace_path.read_text(encoding="utf-8"))
+        marketplace["plugins"].append({"name": "broken", "source": None})
+        marketplace_path.write_text(json.dumps(marketplace), encoding="utf-8")
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("external source", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
