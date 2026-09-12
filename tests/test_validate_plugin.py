@@ -9,6 +9,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from scripts.validate_plugin import validate as validate_in_process
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = REPO_ROOT / "scripts" / "validate_plugin.py"
@@ -73,6 +75,28 @@ class PluginValidationTests(unittest.TestCase):
 
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("forbidden payload directory", result.stderr)
+
+    def test_validator_ignores_python_bytecode_cache(self) -> None:
+        root = self.make_plugin()
+        cache = root / "tests" / "__pycache__"
+        cache.mkdir()
+        (cache / "test_validate_plugin.cpython-313.pyc").write_bytes(b"bytecode")
+
+        result = self.validate(root)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_in_process_validation_resolves_root_before_containment_checks(self) -> None:
+        root = self.make_plugin()
+        alias = root.parent / "plugin-alias"
+        try:
+            alias.symlink_to(root, target_is_directory=True)
+        except OSError as error:
+            self.skipTest(f"symlink creation is unavailable: {error}")
+
+        problems = validate_in_process(alias)
+
+        self.assertEqual(problems, [])
 
     def test_payload_over_total_limit_fails(self) -> None:
         root = self.make_plugin()
@@ -157,7 +181,10 @@ class PluginValidationTests(unittest.TestCase):
         target.mkdir()
         (target / "vectors.faiss").write_bytes(b"outside payload")
         (root / "portfolio").mkdir()
-        (root / "portfolio" / "linked").symlink_to(target, target_is_directory=True)
+        try:
+            (root / "portfolio" / "linked").symlink_to(target, target_is_directory=True)
+        except OSError as error:
+            self.skipTest(f"symlink creation is unavailable: {error}")
 
         result = self.validate(root)
 

@@ -154,6 +154,8 @@ def check_payload(root: Path, problems: list[str]) -> None:
         relative = path.relative_to(root)
         if relative.parts and relative.parts[0] == ".git":
             continue
+        if "__pycache__" in relative.parts:
+            continue
         if ".git" in relative.parts:
             problems.append(f"nested .git directory is not allowed in payload: {relative.as_posix()}")
             continue
@@ -180,6 +182,7 @@ def check_payload(root: Path, problems: list[str]) -> None:
 
 
 def validate(root: Path) -> list[str]:
+    root = root.resolve()
     problems: list[str] = []
     if not root.is_dir():
         return [f"plugin root does not exist: {root}"]
