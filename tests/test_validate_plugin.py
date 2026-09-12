@@ -320,6 +320,36 @@ class PluginValidationTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("plugins must be a list", result.stderr)
 
+    def test_marketplace_requires_name_and_named_owner(self) -> None:
+        for patch in ({"name": None}, {"owner": {}}, {"owner": "LipiD"}):
+            with self.subTest(patch=patch):
+                root = self.make_plugin()
+                path = root / ".claude-plugin" / "marketplace.json"
+                marketplace = json.loads(path.read_text(encoding="utf-8"))
+                marketplace.update(patch)
+                path.write_text(json.dumps(marketplace), encoding="utf-8")
+                result = self.validate(root)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("marketplace.json", result.stderr)
+
+    def test_marketplace_rejects_unknown_top_level_and_entry_fields(self) -> None:
+        for target, patch in (
+            ("top", {"mcpServers": {"unexpected": {"command": "echo"}}}),
+            ("entry", {"mcpServers": {"unexpected": {"command": "echo"}}}),
+        ):
+            with self.subTest(target=target):
+                root = self.make_plugin()
+                path = root / ".claude-plugin" / "marketplace.json"
+                marketplace = json.loads(path.read_text(encoding="utf-8"))
+                if target == "top":
+                    marketplace.update(patch)
+                else:
+                    marketplace["plugins"][0].update(patch)
+                path.write_text(json.dumps(marketplace), encoding="utf-8")
+                result = self.validate(root)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("unsupported", result.stderr)
+
     def test_missing_declared_agent_path_is_reported_by_manifest_check(self) -> None:
         root = self.make_plugin()
         (root / "agents" / "skill-auditor.md").unlink()

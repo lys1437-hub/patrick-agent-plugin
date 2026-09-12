@@ -39,6 +39,8 @@ ALLOWED_SUFFIXES = {".md", ".json", ".py", ".html", ".toml", ".yaml", ".yml", ".
 FORBIDDEN_DIRECTORIES = {"data", "dataset", "corpus", "index", "indexes", "cache", ".cache", ".venv", "venv", "node_modules", "__pycache__"}
 FORBIDDEN_SUFFIXES = {".db", ".sqlite", ".faiss", ".npy", ".npz", ".pkl", ".pickle", ".pt", ".onnx", ".bin"}
 ALLOWED_PLUGIN_FIELDS = {"name", "version", "description", "author", "keywords", "skills", "agents"}
+ALLOWED_MARKETPLACE_FIELDS = {"name", "description", "owner", "plugins"}
+ALLOWED_MARKETPLACE_ENTRY_FIELDS = {"name", "source", "description"}
 EXTERNAL_SOURCE_FIELDS = {"source", "repo", "sha"}
 REPOSITORY_COMPONENT = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
 
@@ -88,6 +90,14 @@ def check_manifest_paths(root: Path, plugin: dict, marketplace: dict, problems: 
             if not target.exists():
                 problems.append(f"plugin.json declares a missing path: {entry[2:]}")
 
+    for key in sorted(set(marketplace) - ALLOWED_MARKETPLACE_FIELDS):
+        problems.append(f"unsupported marketplace.json field: {key}")
+    if not isinstance(marketplace.get("name"), str) or not marketplace["name"]:
+        problems.append("marketplace.json name must be a non-empty string")
+    owner = marketplace.get("owner")
+    if not isinstance(owner, dict) or not isinstance(owner.get("name"), str) or not owner["name"]:
+        problems.append("marketplace.json owner must contain a non-empty name")
+
     plugins = marketplace.get("plugins")
     if not isinstance(plugins, list):
         problems.append("marketplace.json plugins must be a list")
@@ -97,6 +107,8 @@ def check_manifest_paths(root: Path, plugin: dict, marketplace: dict, problems: 
         if not isinstance(entry, dict):
             problems.append("marketplace.json plugins entries must be objects")
             continue
+        for key in sorted(set(entry) - ALLOWED_MARKETPLACE_ENTRY_FIELDS):
+            problems.append(f"unsupported marketplace.json plugin entry field: {key}")
         name, source = entry.get("name"), entry.get("source")
         if not isinstance(name, str) or not name:
             problems.append("marketplace.json plugin entry must have a non-empty name")
