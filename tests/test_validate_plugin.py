@@ -270,6 +270,70 @@ class PluginValidationTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("valid JSON", result.stderr)
 
+    def test_external_source_rejects_extra_fields_and_dot_segments(self) -> None:
+        for patch in ({"ref": "main"}, {"repo": "../.."}):
+            with self.subTest(patch=patch):
+                root = self.make_plugin()
+                path = root / ".claude-plugin" / "marketplace.json"
+                marketplace = json.loads(path.read_text(encoding="utf-8"))
+                marketplace["plugins"][1]["source"].update(patch)
+                path.write_text(json.dumps(marketplace), encoding="utf-8")
+                result = self.validate(root)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("external source", result.stderr)
+
+    def test_validator_rejects_extra_cli_arguments(self) -> None:
+        root = self.make_plugin()
+        result = subprocess.run(
+            ["python3", str(VALIDATOR), str(root), "--strict"],
+            check=False, capture_output=True, text=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("usage", result.stderr)
+
+    def test_manifest_must_be_a_json_object(self) -> None:
+        root = self.make_plugin()
+        (root / ".claude-plugin" / "plugin.json").write_text("[]", encoding="utf-8")
+        result = self.validate(root)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("JSON object", result.stderr)
+
+    def test_marketplace_plugin_entries_must_be_named_objects(self) -> None:
+        for entry in ([], {"name": "", "source": "./"}):
+            with self.subTest(entry=entry):
+                root = self.make_plugin()
+                path = root / ".claude-plugin" / "marketplace.json"
+                marketplace = json.loads(path.read_text(encoding="utf-8"))
+                marketplace["plugins"].append(entry)
+                path.write_text(json.dumps(marketplace), encoding="utf-8")
+                result = self.validate(root)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("marketplace.json", result.stderr)
+
+    def test_marketplace_plugins_must_be_a_list(self) -> None:
+        root = self.make_plugin()
+        path = root / ".claude-plugin" / "marketplace.json"
+        marketplace = json.loads(path.read_text(encoding="utf-8"))
+        marketplace["plugins"] = {}
+        path.write_text(json.dumps(marketplace), encoding="utf-8")
+        result = self.validate(root)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("plugins must be a list", result.stderr)
+
+    def test_missing_declared_agent_path_is_reported_by_manifest_check(self) -> None:
+        root = self.make_plugin()
+        (root / "agents" / "skill-auditor.md").unlink()
+        result = self.validate(root)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("declares a missing path", result.stderr)
+
+    def test_skill_set_mismatch_has_its_own_error(self) -> None:
+        root = self.make_plugin()
+        (root / "skills" / "one-page-report").rename(root / "skills" / "renamed-skill")
+        result = self.validate(root)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Skill set mismatch", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

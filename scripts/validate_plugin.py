@@ -39,6 +39,8 @@ ALLOWED_SUFFIXES = {".md", ".json", ".py", ".html", ".toml", ".yaml", ".yml", ".
 FORBIDDEN_DIRECTORIES = {"data", "dataset", "corpus", "index", "indexes", "cache", ".cache", ".venv", "venv", "node_modules", "__pycache__"}
 FORBIDDEN_SUFFIXES = {".db", ".sqlite", ".faiss", ".npy", ".npz", ".pkl", ".pickle", ".pt", ".onnx", ".bin"}
 ALLOWED_PLUGIN_FIELDS = {"name", "version", "description", "author", "keywords", "skills", "agents"}
+EXTERNAL_SOURCE_FIELDS = {"source", "repo", "sha"}
+REPOSITORY_COMPONENT = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
 
 
 def load_json(root: Path, relative_path: str, problems: list[str]) -> dict | None:
@@ -85,10 +87,6 @@ def check_manifest_paths(root: Path, plugin: dict, marketplace: dict, problems: 
             target = (root / entry[2:]).resolve()
             if not target.exists():
                 problems.append(f"plugin.json declares a missing path: {entry[2:]}")
-            elif key == "skills" and not target.is_dir():
-                problems.append(f"plugin.json skills must declare a directory: {entry[2:]}")
-            elif key == "agents" and not target.is_file():
-                problems.append(f"plugin.json agents must declare a file: {entry[2:]}")
 
     plugins = marketplace.get("plugins")
     if not isinstance(plugins, list):
@@ -114,7 +112,12 @@ def check_manifest_paths(root: Path, plugin: dict, marketplace: dict, problems: 
             problems.append("marketplace.json external source must be a GitHub source object")
             continue
         repo, sha = source.get("repo"), source.get("sha")
-        if source.get("source") != "github" or not isinstance(repo, str) or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repo) or not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha):
+        repo_parts = repo.split("/") if isinstance(repo, str) else []
+        valid_repo = len(repo_parts) == 2 and all(
+            part not in {".", ".."} and REPOSITORY_COMPONENT.fullmatch(part)
+            for part in repo_parts
+        )
+        if set(source) != EXTERNAL_SOURCE_FIELDS or source.get("source") != "github" or not valid_repo or not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha):
             problems.append("marketplace.json external source must have github, owner/repo, and a 40-character SHA")
     if len(local_plugins) != 1 or local_plugins[0].get("name") != "patrick-agent" or local_plugins[0].get("source") != "./":
         problems.append("marketplace.json must declare exactly one patrick-agent plugin with source './'")
@@ -184,6 +187,9 @@ def validate(root: Path) -> list[str]:
 
 
 def main() -> int:
+    if len(sys.argv) > 2:
+        print("usage: validate_plugin.py [plugin-root]", file=sys.stderr)
+        return 2
     root = Path(sys.argv[1]).resolve() if len(sys.argv) == 2 else Path.cwd()
     problems = validate(root)
     if problems:
