@@ -220,6 +220,56 @@ class PluginValidationTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("owner/repo", result.stderr)
 
+    def test_marketplace_requires_a_pinned_lowercase_sha(self) -> None:
+        for invalid_sha in ("abc", "A" * 40, None):
+            with self.subTest(sha=invalid_sha):
+                root = self.make_plugin()
+                marketplace_path = root / ".claude-plugin" / "marketplace.json"
+                marketplace = json.loads(marketplace_path.read_text(encoding="utf-8"))
+                marketplace["plugins"][1]["source"]["sha"] = invalid_sha
+                marketplace_path.write_text(json.dumps(marketplace), encoding="utf-8")
+
+                result = self.validate(root)
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("40-character SHA", result.stderr)
+
+    def test_unknown_top_level_payload_file_fails(self) -> None:
+        root = self.make_plugin()
+        (root / ".env").write_text("not allowed", encoding="utf-8")
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unknown payload path", result.stderr)
+
+    def test_forbidden_suffix_inside_skill_fails(self) -> None:
+        root = self.make_plugin()
+        (root / "skills" / "skill-doctor" / "model.bin").write_bytes(b"not allowed")
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden payload file type", result.stderr)
+
+    def test_disallowed_suffix_inside_skill_fails(self) -> None:
+        root = self.make_plugin()
+        (root / "skills" / "skill-doctor" / "settings.ini").write_text("not allowed", encoding="utf-8")
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unknown payload path", result.stderr)
+
+    def test_non_utf8_manifest_reports_validation_error(self) -> None:
+        root = self.make_plugin()
+        (root / ".claude-plugin" / "plugin.json").write_bytes(b"\xff")
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("valid JSON", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
