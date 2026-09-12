@@ -56,6 +56,8 @@ def load_json(root: Path, relative_path: str, problems: list[str]) -> dict | Non
 
 
 def check_manifest_paths(root: Path, plugin: dict, marketplace: dict, problems: list[str]) -> None:
+    if plugin.get("name") != "patrick-agent":
+        problems.append("plugin.json name must be 'patrick-agent'")
     expected_paths = {"skills": ["./skills"], "agents": ["./agents/skill-auditor.md"]}
     for key, expected in expected_paths.items():
         entries = plugin.get(key)

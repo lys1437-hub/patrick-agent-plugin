@@ -114,6 +114,18 @@ class PluginValidationTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("plugin.json skills", result.stderr)
 
+    def test_plugin_manifest_requires_the_expected_name(self) -> None:
+        root = self.make_plugin()
+        plugin_path = root / ".claude-plugin" / "plugin.json"
+        plugin = json.loads(plugin_path.read_text(encoding="utf-8"))
+        plugin["name"] = "unrelated-plugin"
+        plugin_path.write_text(json.dumps(plugin), encoding="utf-8")
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("plugin.json name", result.stderr)
+
     def test_marketplace_manifest_requires_the_local_plugin_entry(self) -> None:
         root = self.make_plugin()
         (root / ".claude-plugin" / "marketplace.json").write_text(
