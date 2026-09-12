@@ -86,6 +86,17 @@ class PluginValidationTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_validator_rejects_non_bytecode_inside_python_cache(self) -> None:
+        root = self.make_plugin()
+        cache = root / "skills" / "skill-doctor" / "__pycache__"
+        cache.mkdir()
+        (cache / "model.bin").write_bytes(b"not bytecode")
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden payload directory", result.stderr)
+
     def test_in_process_validation_resolves_root_before_containment_checks(self) -> None:
         root = self.make_plugin()
         alias = root.parent / "plugin-alias"

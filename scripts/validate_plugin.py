@@ -154,13 +154,15 @@ def check_payload(root: Path, problems: list[str]) -> None:
         relative = path.relative_to(root)
         if relative.parts and relative.parts[0] == ".git":
             continue
-        if "__pycache__" in relative.parts:
-            continue
         if ".git" in relative.parts:
             problems.append(f"nested .git directory is not allowed in payload: {relative.as_posix()}")
             continue
         if path.is_symlink():
             problems.append(f"symbolic link is not allowed in payload: {relative.as_posix()}")
+            continue
+        if path.is_dir() and path.name == "__pycache__":
+            continue
+        if path.is_file() and "__pycache__" in relative.parts and path.suffix == ".pyc":
             continue
         if any(part.lower() in FORBIDDEN_DIRECTORIES for part in relative.parts):
             problems.append(f"forbidden payload directory: {relative.as_posix()}")
