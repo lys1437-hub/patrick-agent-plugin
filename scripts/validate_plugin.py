@@ -160,7 +160,7 @@ def check_payload(root: Path, problems: list[str]) -> None:
         if path.is_symlink():
             problems.append(f"symbolic link is not allowed in payload: {relative.as_posix()}")
             continue
-        if any(part in FORBIDDEN_DIRECTORIES for part in relative.parts):
+        if any(part.lower() in FORBIDDEN_DIRECTORIES for part in relative.parts):
             problems.append(f"forbidden payload directory: {relative.as_posix()}")
             continue
         if not path.is_file():

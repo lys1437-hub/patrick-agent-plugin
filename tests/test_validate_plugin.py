@@ -62,15 +62,17 @@ class PluginValidationTests(unittest.TestCase):
         self.assertIn("Skill", result.stderr)
 
     def test_forbidden_payload_directory_fails(self) -> None:
-        root = self.make_plugin()
-        forbidden = root / "portfolio" / "retrieval" / "cache"
-        forbidden.mkdir(parents=True)
-        (forbidden / "vectors.faiss").write_bytes(b"not a real index")
+        for directory_name in ("cache", "Cache", "DATA"):
+            with self.subTest(directory_name=directory_name):
+                root = self.make_plugin()
+                forbidden = root / "portfolio" / "retrieval" / directory_name
+                forbidden.mkdir(parents=True)
+                (forbidden / "rows.csv").write_text("not a dataset", encoding="utf-8")
 
-        result = self.validate(root)
+                result = self.validate(root)
 
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("forbidden", result.stderr)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("forbidden payload directory", result.stderr)
 
     def test_payload_over_total_limit_fails(self) -> None:
         root = self.make_plugin()
