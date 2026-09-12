@@ -56,23 +56,36 @@ def load_json(root: Path, relative_path: str, problems: list[str]) -> dict | Non
 
 
 def check_manifest_paths(root: Path, plugin: dict, marketplace: dict, problems: list[str]) -> None:
-    for key in ("skills", "agents"):
-        entries = plugin.get(key, [])
-        if not isinstance(entries, list):
-            problems.append(f"plugin.json {key} must be a list")
+    expected_paths = {"skills": ["./skills"], "agents": ["./agents/skill-auditor.md"]}
+    for key, expected in expected_paths.items():
+        entries = plugin.get(key)
+        if isinstance(entries, list):
+            for entry in entries:
+                if not isinstance(entry, str) or not entry.startswith("./"):
+                    problems.append(f"plugin.json {key} has an invalid local path: {entry!r}")
+                    continue
+                target = (root / entry[2:]).resolve()
+                try:
+                    target.relative_to(root)
+                except ValueError:
+                    problems.append(f"plugin.json {key} escapes payload root: {entry}")
+        if entries != expected:
+            problems.append(f"plugin.json {key} must equal {expected}")
             continue
         for entry in entries:
-            if not isinstance(entry, str) or not entry.startswith("./"):
-                problems.append(f"plugin.json {key} has an invalid local path: {entry!r}")
-                continue
-            target = root / entry[2:]
+            target = (root / entry[2:]).resolve()
             if not target.exists():
                 problems.append(f"plugin.json declares a missing path: {entry[2:]}")
+            elif key == "skills" and not target.is_dir():
+                problems.append(f"plugin.json skills must declare a directory: {entry[2:]}")
+            elif key == "agents" and not target.is_file():
+                problems.append(f"plugin.json agents must declare a file: {entry[2:]}")
 
     plugins = marketplace.get("plugins")
     if not isinstance(plugins, list):
         problems.append("marketplace.json plugins must be a list")
         return
+    local_plugins = []
     for entry in plugins:
         if not isinstance(entry, dict):
             problems.append("marketplace.json plugins entries must be objects")
@@ -80,10 +93,13 @@ def check_manifest_paths(root: Path, plugin: dict, marketplace: dict, problems: 
         source = entry.get("source")
         if not isinstance(source, str):
             continue  # External plugin sources are deliberately not local payload paths.
+        local_plugins.append(entry)
         if source != "./":
             problems.append(f"marketplace.json has an unsupported local source: {source!r}")
         elif not (root / ".claude-plugin" / "plugin.json").is_file():
             problems.append("marketplace.json root source is missing .claude-plugin/plugin.json")
+    if len(local_plugins) != 1 or local_plugins[0].get("name") != "patrick-agent" or local_plugins[0].get("source") != "./":
+        problems.append("marketplace.json must declare exactly one patrick-agent plugin with source './'")
 
 
 def is_allowed(relative: Path) -> bool:
@@ -101,6 +117,9 @@ def check_payload(root: Path, problems: list[str]) -> None:
         if ".git" in path.parts:
             continue
         relative = path.relative_to(root)
+        if path.is_symlink():
+            problems.append(f"symbolic link is not allowed in payload: {relative.as_posix()}")
+            continue
         if any(part in FORBIDDEN_DIRECTORIES for part in relative.parts):
             problems.append(f"forbidden payload directory: {relative.as_posix()}")
             continue
@@ -135,6 +154,10 @@ def validate(root: Path) -> list[str]:
     actual_skills = {path.name for path in skills_path.iterdir() if path.is_dir()} if skills_path.is_dir() else set()
     if actual_skills != EXPECTED_SKILLS:
         problems.append(f"Skill set mismatch: expected {sorted(EXPECTED_SKILLS)}, got {sorted(actual_skills)}")
+    for skill in sorted(EXPECTED_SKILLS):
+        entry = skills_path / skill / "SKILL.md"
+        if not entry.is_file():
+            problems.append(f"missing required Skill entry: skills/{skill}/SKILL.md")
     check_payload(root, problems)
     return problems
 

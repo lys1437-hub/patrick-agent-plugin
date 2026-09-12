@@ -103,6 +103,62 @@ class PluginValidationTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("valid JSON", result.stderr)
 
+    def test_plugin_manifest_requires_the_expected_local_paths(self) -> None:
+        root = self.make_plugin()
+        (root / ".claude-plugin" / "plugin.json").write_text(
+            json.dumps({"name": "patrick-agent", "skills": [], "agents": []}), encoding="utf-8"
+        )
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("plugin.json skills", result.stderr)
+
+    def test_marketplace_manifest_requires_the_local_plugin_entry(self) -> None:
+        root = self.make_plugin()
+        (root / ".claude-plugin" / "marketplace.json").write_text(
+            json.dumps({"name": "patrick-agent-marketplace", "plugins": []}), encoding="utf-8"
+        )
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("marketplace.json", result.stderr)
+
+    def test_local_manifest_path_cannot_escape_the_payload_root(self) -> None:
+        root = self.make_plugin()
+        plugin = json.loads((root / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+        plugin["skills"] = ["./../outside"]
+        (root.parent / "outside").mkdir()
+        (root / ".claude-plugin" / "plugin.json").write_text(json.dumps(plugin), encoding="utf-8")
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("escapes payload root", result.stderr)
+
+    def test_symbolic_link_in_payload_fails(self) -> None:
+        root = self.make_plugin()
+        target = root.parent / "external-payload"
+        target.mkdir()
+        (target / "vectors.faiss").write_bytes(b"outside payload")
+        (root / "portfolio").mkdir()
+        (root / "portfolio" / "linked").symlink_to(target, target_is_directory=True)
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("symbolic link", result.stderr)
+
+    def test_each_expected_skill_requires_its_skill_markdown(self) -> None:
+        root = self.make_plugin()
+        (root / "skills" / "one-page-report" / "SKILL.md").unlink()
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("skills/one-page-report/SKILL.md", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
