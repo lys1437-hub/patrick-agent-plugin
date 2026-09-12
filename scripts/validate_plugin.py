@@ -103,6 +103,7 @@ def check_manifest_paths(root: Path, plugin: dict, marketplace: dict, problems: 
         problems.append("marketplace.json plugins must be a list")
         return
     local_plugins = []
+    plugin_names: set[str] = set()
     for entry in plugins:
         if not isinstance(entry, dict):
             problems.append("marketplace.json plugins entries must be objects")
@@ -113,6 +114,9 @@ def check_manifest_paths(root: Path, plugin: dict, marketplace: dict, problems: 
         if not isinstance(name, str) or not name:
             problems.append("marketplace.json plugin entry must have a non-empty name")
             continue
+        if name in plugin_names:
+            problems.append(f"marketplace.json plugin names must be unique: {name!r}")
+        plugin_names.add(name)
         if isinstance(source, str):
             local_plugins.append(entry)
             if source != "./":

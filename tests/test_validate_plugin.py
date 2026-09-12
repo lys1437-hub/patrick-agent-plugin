@@ -350,6 +350,18 @@ class PluginValidationTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("unsupported", result.stderr)
 
+    def test_marketplace_plugin_names_must_be_unique(self) -> None:
+        for entry_index, duplicate_name in ((1, "patrick-agent"), (0, "superpowers")):
+            with self.subTest(entry_index=entry_index, duplicate_name=duplicate_name):
+                root = self.make_plugin()
+                path = root / ".claude-plugin" / "marketplace.json"
+                marketplace = json.loads(path.read_text(encoding="utf-8"))
+                marketplace["plugins"][entry_index]["name"] = duplicate_name
+                path.write_text(json.dumps(marketplace), encoding="utf-8")
+                result = self.validate(root)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("unique", result.stderr)
+
     def test_missing_declared_agent_path_is_reported_by_manifest_check(self) -> None:
         root = self.make_plugin()
         (root / "agents" / "skill-auditor.md").unlink()
