@@ -110,8 +110,8 @@ def check_manifest_paths(root: Path, plugin: dict, marketplace: dict, problems: 
         if not isinstance(source, dict):
             problems.append("marketplace.json external source must be a GitHub source object")
             continue
-        if source.get("source") != "github" or not isinstance(source.get("repo"), str) or not re.fullmatch(r"[0-9a-f]{40}", source.get("sha", "")):
-            problems.append("marketplace.json external source must have github, repo, and a 40-character SHA")
+        if source.get("source") != "github" or not isinstance(source.get("repo"), str) or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", source.get("repo", "")) or not re.fullmatch(r"[0-9a-f]{40}", source.get("sha", "")):
+            problems.append("marketplace.json external source must have github, owner/repo, and a 40-character SHA")
     if len(local_plugins) != 1 or local_plugins[0].get("name") != "patrick-agent" or local_plugins[0].get("source") != "./":
         problems.append("marketplace.json must declare exactly one patrick-agent plugin with source './'")
 

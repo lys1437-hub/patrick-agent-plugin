@@ -206,6 +206,20 @@ class PluginValidationTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("external source", result.stderr)
 
+    def test_marketplace_requires_owner_and_repo_for_external_source(self) -> None:
+        for invalid_repo in ("", "   ", "owner"):
+            with self.subTest(repo=invalid_repo):
+                root = self.make_plugin()
+                marketplace_path = root / ".claude-plugin" / "marketplace.json"
+                marketplace = json.loads(marketplace_path.read_text(encoding="utf-8"))
+                marketplace["plugins"][1]["source"]["repo"] = invalid_repo
+                marketplace_path.write_text(json.dumps(marketplace), encoding="utf-8")
+
+                result = self.validate(root)
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("owner/repo", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
