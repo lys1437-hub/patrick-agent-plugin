@@ -89,6 +89,8 @@ def check_manifest_paths(root: Path, plugin: dict, marketplace: dict, problems: 
     author = plugin.get("author")
     if not isinstance(author, dict) or not isinstance(author.get("name"), str) or not author["name"].strip():
         problems.append("plugin.json author must contain a non-empty name")
+    elif "email" in author and (not isinstance(author["email"], str) or not author["email"].strip()):
+        problems.append("plugin.json author.email must be a non-empty string when present")
     keywords = plugin.get("keywords")
     if not isinstance(keywords, list) or not keywords or any(not isinstance(keyword, str) or not keyword.strip() for keyword in keywords):
         problems.append("plugin.json keywords must be a non-empty list of strings")

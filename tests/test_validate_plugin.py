@@ -152,6 +152,18 @@ class PluginValidationTests(unittest.TestCase):
         self.assertIn("plugin.json version", result.stderr)
         self.assertIn("plugin.json license", result.stderr)
 
+    def test_plugin_manifest_rejects_non_string_author_email(self) -> None:
+        root = self.make_plugin()
+        path = root / ".claude-plugin" / "plugin.json"
+        plugin = json.loads(path.read_text(encoding="utf-8"))
+        plugin["author"]["email"] = 123
+        path.write_text(json.dumps(plugin), encoding="utf-8")
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("author.email", result.stderr)
+
     def test_agent_contract_rejects_write_capabilities(self) -> None:
         root = self.make_plugin()
         path = root / "agents" / "skill-auditor.md"
