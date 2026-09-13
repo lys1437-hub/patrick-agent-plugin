@@ -117,6 +117,17 @@ class PluginValidationTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("tracked payload file is missing", result.stderr)
 
+    def test_validator_rejects_missing_expected_support_file_from_inventory(self) -> None:
+        root = self.make_plugin()
+        subprocess.run(["git", "init", "-q", str(root)], check=True)
+        subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(root), "rm", "--cached", "skills/one-page-report/references/skeleton.html"], check=True, capture_output=True)
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("missing expected release path: skills/one-page-report/references/skeleton.html", result.stderr)
+
     def test_validator_rejects_gitlink_in_release_inventory(self) -> None:
         root = self.make_plugin()
         subprocess.run(["git", "init", "-q", str(root)], check=True)

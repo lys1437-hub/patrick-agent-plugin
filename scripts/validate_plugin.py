@@ -35,6 +35,60 @@ REQUIRED_FILES = {
     "skills/skill-workflow-builder/LICENSE",
     "skills/skill-workflow-builder/NOTICE",
 }
+EXPECTED_TRACKED_PATHS = frozenset(""".claude-plugin/marketplace.json
+.claude-plugin/plugin.json
+.github/workflows/plugin-validation.yml
+.gitignore
+ACCEPTANCE-LEVELS.md
+LICENSE
+README.md
+TEAM_RULES.md
+WHY-THESE-RULES.md
+agents/skill-auditor.md
+scripts/validate_plugin.py
+skills/feature-proposal-planning/SKILL.md
+skills/feature-proposal-planning/evals/unsourced-metric/graders/must-ask-for-caliber.md
+skills/feature-proposal-planning/evals/unsourced-metric/prompt.md
+skills/one-page-report/SKILL.md
+skills/one-page-report/evals/undecided-options/graders/must-not-render-undecided.md
+skills/one-page-report/evals/undecided-options/prompt.md
+skills/one-page-report/references/skeleton.html
+skills/one-page-report/scripts/check_page.py
+skills/report-and-verification/LICENSE
+skills/report-and-verification/NOTICE
+skills/report-and-verification/SKILL.md
+skills/report-and-verification/evals/artifact-missing/graders/must-not-verify.md
+skills/report-and-verification/evals/artifact-missing/prompt.md
+skills/report-and-verification/evals/cases.json
+skills/report-and-verification/evals/grader.md
+skills/report-and-verification/references/artifact-consistency.md
+skills/report-and-verification/references/decision-grade-verification.md
+skills/skill-doctor/SKILL.md
+skills/skill-workflow-builder/LICENSE
+skills/skill-workflow-builder/NOTICE
+skills/skill-workflow-builder/SKILL.md
+skills/skill-workflow-builder/evals/cases.json
+skills/skill-workflow-builder/evals/grader.md
+skills/skill-workflow-builder/evals/one-off/graders/must-not-create.md
+skills/skill-workflow-builder/evals/one-off/prompt.md
+skills/team-delivery-review/SKILL.md
+skills/team-delivery-review/evals/accept-the-doc/graders/must-not-accept-and-must-not-fix.md
+skills/team-delivery-review/evals/accept-the-doc/prompt.md
+skills/team-delivery-review/evals/post-claim-change/graders/must-expire-old-pass.md
+skills/team-delivery-review/evals/post-claim-change/prompt.md
+skills/team-delivery-review/evals/runtime-behind-remote/graders/must-separate-runtime.md
+skills/team-delivery-review/evals/runtime-behind-remote/prompt.md
+skills/team-delivery-review/evals/stale-handoff/README.md
+skills/team-delivery-review/evals/stale-handoff/graders/four-rules.md
+skills/team-delivery-review/evals/stale-handoff/prompt.md
+skills/team-delivery-review/evals/stale-pass-new-artifact/graders/must-not-reuse-pass.md
+skills/team-delivery-review/evals/stale-pass-new-artifact/prompt.md
+skills/team-weekly-review/SKILL.md
+skills/team-weekly-review/evals/missing-optional-sources/graders/must-show-unavailable.md
+skills/team-weekly-review/evals/missing-optional-sources/prompt.md
+skills/team-weekly-review/evals/split-environments/graders/must-not-merge-views.md
+skills/team-weekly-review/evals/split-environments/prompt.md
+tests/test_validate_plugin.py""".splitlines())
 ALLOWED_EXACT_FILES = REQUIRED_FILES | {
     ".gitignore",
     ".github/workflows/plugin-validation.yml",
@@ -288,6 +342,11 @@ def validate(root: Path) -> list[str]:
         return [f"plugin root does not exist: {root}"]
     tracked_entries = tracked_payload_entries(root)
     tracked_paths = {relative.as_posix() for _, relative in tracked_entries} if tracked_entries is not None else None
+    if tracked_paths is not None:
+        for relative in sorted(EXPECTED_TRACKED_PATHS - tracked_paths):
+            problems.append(f"missing expected release path: {relative}")
+        for relative in sorted(tracked_paths - EXPECTED_TRACKED_PATHS):
+            problems.append(f"unexpected release path: {relative}")
     for relative in sorted(REQUIRED_FILES):
         if not (root / relative).is_file() or (tracked_paths is not None and relative not in tracked_paths):
             problems.append(f"missing required file: {relative}")
