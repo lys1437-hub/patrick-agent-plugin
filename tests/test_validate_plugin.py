@@ -88,6 +88,35 @@ class PluginValidationTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("missing required Skill entry: skills/skill-doctor/SKILL.md", result.stderr)
 
+    def test_skill_license_and_notice_must_be_present_and_tracked(self) -> None:
+        root = self.make_plugin()
+        subprocess.run(["git", "init", "-q", str(root)], check=True)
+        subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+        for relative in (
+            "skills/report-and-verification/LICENSE",
+            "skills/report-and-verification/NOTICE",
+            "skills/skill-workflow-builder/LICENSE",
+            "skills/skill-workflow-builder/NOTICE",
+        ):
+            (root / relative).unlink()
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("skills/report-and-verification/LICENSE", result.stderr)
+        self.assertIn("skills/skill-workflow-builder/NOTICE", result.stderr)
+
+    def test_validator_rejects_tracked_file_missing_from_working_tree(self) -> None:
+        root = self.make_plugin()
+        subprocess.run(["git", "init", "-q", str(root)], check=True)
+        subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+        (root / "skills" / "one-page-report" / "scripts" / "check_page.py").unlink()
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("tracked payload file is missing", result.stderr)
+
     def test_validator_rejects_gitlink_in_release_inventory(self) -> None:
         root = self.make_plugin()
         subprocess.run(["git", "init", "-q", str(root)], check=True)

@@ -30,6 +30,10 @@ REQUIRED_FILES = {
     ".claude-plugin/plugin.json",
     ".claude-plugin/marketplace.json",
     "agents/skill-auditor.md",
+    "skills/report-and-verification/LICENSE",
+    "skills/report-and-verification/NOTICE",
+    "skills/skill-workflow-builder/LICENSE",
+    "skills/skill-workflow-builder/NOTICE",
 }
 ALLOWED_EXACT_FILES = REQUIRED_FILES | {
     ".gitignore",
@@ -247,6 +251,9 @@ def check_payload(root: Path, problems: list[str], tracked_entries: list[tuple[s
             continue
         if mode is not None and mode not in {"100644", "100755"}:
             problems.append(f"unsupported Git entry mode {mode}: {relative.as_posix()}")
+            continue
+        if mode is not None and not path.is_file():
+            problems.append(f"tracked payload file is missing from working tree: {relative.as_posix()}")
             continue
         if path.is_symlink():
             problems.append(f"symbolic link is not allowed in payload: {relative.as_posix()}")
