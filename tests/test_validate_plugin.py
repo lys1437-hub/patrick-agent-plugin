@@ -155,21 +155,26 @@ class PluginValidationTests(unittest.TestCase):
     def test_validator_rejects_unmerged_git_index_stage(self) -> None:
         root = self.make_plugin()
         subprocess.run(["git", "init", "-q", str(root)], check=True)
+        subprocess.run(["git", "-C", str(root), "config", "user.email", "validation@example.invalid"], check=True)
+        subprocess.run(["git", "-C", str(root), "config", "user.name", "Validation Fixture"], check=True)
         subprocess.run(["git", "-C", str(root), "add", "."], check=True)
-        unmerged_path = root / "unmerged-stage.txt"
-        unmerged_path.write_text("unmerged index fixture\n", encoding="utf-8")
-        blob = subprocess.run(
-            ["git", "-C", str(root), "hash-object", "-w", str(unmerged_path)],
+        subprocess.run(["git", "-C", str(root), "commit", "-qm", "initial fixture"], check=True)
+        base_branch = subprocess.run(
+            ["git", "-C", str(root), "branch", "--show-current"],
             check=True,
             capture_output=True,
             text=True,
         ).stdout.strip()
-        subprocess.run(
-            ["git", "-C", str(root), "update-index", "--add", "--index-info"],
-            input=f"100644 {blob} 1\tunmerged-stage.txt\n",
-            check=True,
-            text=True,
-        )
+        subprocess.run(["git", "-C", str(root), "checkout", "-qb", "incoming"], check=True)
+        (root / "README.md").write_text("incoming change\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(root), "add", "README.md"], check=True)
+        subprocess.run(["git", "-C", str(root), "commit", "-qm", "incoming change"], check=True)
+        subprocess.run(["git", "-C", str(root), "checkout", "-q", base_branch], check=True)
+        (root / "README.md").write_text("current change\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(root), "add", "README.md"], check=True)
+        subprocess.run(["git", "-C", str(root), "commit", "-qm", "current change"], check=True)
+        merge = subprocess.run(["git", "-C", str(root), "merge", "incoming"], check=False, capture_output=True, text=True)
+        self.assertNotEqual(merge.returncode, 0, merge.stdout + merge.stderr)
 
         result = self.validate(root)
 
