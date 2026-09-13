@@ -32,6 +32,7 @@ REQUIRED_FILES = {
     "agents/skill-auditor.md",
 }
 ALLOWED_EXACT_FILES = REQUIRED_FILES | {
+    ".gitignore",
     ".github/workflows/plugin-validation.yml",
     "scripts/validate_plugin.py",
     "tests/test_validate_plugin.py",
@@ -39,7 +40,7 @@ ALLOWED_EXACT_FILES = REQUIRED_FILES | {
 ALLOWED_SUFFIXES = {".md", ".json", ".py", ".html", ".toml", ".yaml", ".yml", ".txt", ".csv"}
 FORBIDDEN_DIRECTORIES = {"data", "dataset", "corpus", "index", "indexes", "cache", ".cache", ".venv", "venv", "node_modules", "__pycache__"}
 FORBIDDEN_SUFFIXES = {".db", ".sqlite", ".faiss", ".npy", ".npz", ".pkl", ".pickle", ".pt", ".onnx", ".bin"}
-ALLOWED_PLUGIN_FIELDS = {"name", "version", "description", "author", "keywords", "skills", "agents"}
+ALLOWED_PLUGIN_FIELDS = {"name", "version", "description", "author", "keywords", "skills", "agents", "license"}
 ALLOWED_MARKETPLACE_FIELDS = {"name", "description", "owner", "plugins"}
 ALLOWED_MARKETPLACE_ENTRY_FIELDS = {"name", "source", "description"}
 EXTERNAL_SOURCE_FIELDS = {"source", "repo", "sha"}
@@ -149,19 +150,31 @@ def is_allowed(relative: Path) -> bool:
     return relative.suffix in ALLOWED_SUFFIXES or relative.name in {"LICENSE", "NOTICE"}
 
 
-def is_tracked(root: Path, relative: Path) -> bool:
-    result = subprocess.run(
-        ["git", "-C", str(root), "ls-files", "--error-unmatch", "--", relative.as_posix()],
-        capture_output=True,
-        check=False,
-        text=True,
-    )
-    return result.returncode == 0
+def tracked_payload_paths(root: Path) -> list[Path] | None:
+    """Return Git-tracked payload paths when Git is available, otherwise None.
+
+    A release checkout is a Git worktree, so validating its tracked files avoids
+    local editor artefacts changing the result.  Exported plugin directories
+    remain supported through the filesystem fallback.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "-z"],
+            capture_output=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        return None
+    if result.returncode != 0:
+        return None
+    return [root / Path(item) for item in result.stdout.decode("utf-8").split("\0") if item]
 
 
 def check_payload(root: Path, problems: list[str]) -> None:
     total_size = 0
-    for path in sorted(root.rglob("*")):
+    tracked_paths = tracked_payload_paths(root)
+    paths = root.rglob("*") if tracked_paths is None else tracked_paths
+    for path in sorted(paths):
         relative = path.relative_to(root)
         if relative.parts and relative.parts[0] == ".git":
             continue
@@ -173,7 +186,7 @@ def check_payload(root: Path, problems: list[str]) -> None:
             continue
         if path.is_dir() and path.name == "__pycache__":
             continue
-        if path.is_file() and "__pycache__" in relative.parts and path.suffix == ".pyc" and not is_tracked(root, relative):
+        if path.is_file() and "__pycache__" in relative.parts and path.suffix == ".pyc" and tracked_paths is None:
             continue
         if any(part.lower() in FORBIDDEN_DIRECTORIES for part in relative.parts):
             problems.append(f"forbidden payload directory: {relative.as_posix()}")

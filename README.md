@@ -52,7 +52,7 @@ claude plugin list
 ### 2. 確認它真的能用
 
 裝得起來 ≠ 能用。三層驗收見 **`ACCEPTANCE-LEVELS.md`**，
-最少做第一層：打 `/patrick-agent` 看五支在不在。
+最少做第一層：打 `/patrick-agent` 確認七支 skill 都在。
 
 ## 裝完之後怎麼用
 
@@ -73,6 +73,8 @@ claude plugin list
 | `skill-workflow-builder` | 以 baseline 與 forward test 建立或更新最小 Skill；一次性任務不硬建 |
 | `skill-doctor` | 唯讀掃描 Skill 的斷引用、路徑耦合、description 截斷與 provenance |
 | `one-page-report` | 產出單檔、自包含、可列印的一頁報告，並附交付前檢查器 |
+
+另附唯讀的 `skill-auditor` agent；payload 以 Apache-2.0 授權，詳見 [LICENSE](LICENSE)。每次 PR 都會在 Linux、macOS 與 Windows 執行 payload 驗證與 contract tests。
 
 ## 上游 plugin：只給地址，不複製
 

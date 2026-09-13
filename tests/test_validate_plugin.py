@@ -24,7 +24,16 @@ class PluginValidationTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name) / "plugin"
-        shutil.copytree(REPO_ROOT, root, ignore=shutil.ignore_patterns(".git", "__pycache__"))
+        tracked = subprocess.run(
+            ["git", "-C", str(REPO_ROOT), "ls-files", "-z"],
+            check=True,
+            capture_output=True,
+        ).stdout.decode("utf-8").split("\0")
+        for item in filter(None, tracked):
+            source = REPO_ROOT / item
+            destination = root / item
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
         return root
 
     def validate(self, root: Path) -> subprocess.CompletedProcess[str]:
@@ -113,6 +122,11 @@ class PluginValidationTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("forbidden payload directory", result.stderr)
+
+    def test_skill_doctor_describes_the_shipped_agent(self) -> None:
+        contents = (self.make_plugin() / "skills" / "skill-doctor" / "SKILL.md").read_text(encoding="utf-8")
+
+        self.assertIn("skill-auditor", contents)
 
     def test_in_process_validation_resolves_root_before_containment_checks(self) -> None:
         root = self.make_plugin()
