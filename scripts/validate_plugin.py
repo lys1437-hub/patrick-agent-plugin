@@ -1,0 +1,394 @@
+#!/usr/bin/env python3
+"""Validate the exact files shipped by the root-source marketplace plugin."""
+
+from __future__ import annotations
+
+import json
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+
+MAX_TOTAL_BYTES = 512 * 1024
+MAX_FILE_BYTES = 64 * 1024
+EXPECTED_SKILLS = {
+    "feature-proposal-planning",
+    "report-and-verification",
+    "team-delivery-review",
+    "team-weekly-review",
+    "skill-workflow-builder",
+    "skill-doctor",
+    "one-page-report",
+}
+REQUIRED_FILES = {
+    "LICENSE",
+    "README.md",
+    "TEAM_RULES.md",
+    "WHY-THESE-RULES.md",
+    "ACCEPTANCE-LEVELS.md",
+    ".claude-plugin/plugin.json",
+    ".claude-plugin/marketplace.json",
+    "agents/skill-auditor.md",
+    "skills/report-and-verification/LICENSE",
+    "skills/report-and-verification/NOTICE",
+    "skills/skill-workflow-builder/LICENSE",
+    "skills/skill-workflow-builder/NOTICE",
+}
+EXPECTED_TRACKED_PATHS = frozenset(""".claude-plugin/marketplace.json
+.claude-plugin/plugin.json
+.github/workflows/plugin-validation.yml
+.gitignore
+ACCEPTANCE-LEVELS.md
+LICENSE
+README.md
+TEAM_RULES.md
+WHY-THESE-RULES.md
+agents/skill-auditor.md
+scripts/validate_plugin.py
+skills/feature-proposal-planning/SKILL.md
+skills/feature-proposal-planning/evals/unsourced-metric/graders/must-ask-for-caliber.md
+skills/feature-proposal-planning/evals/unsourced-metric/prompt.md
+skills/one-page-report/SKILL.md
+skills/one-page-report/evals/undecided-options/graders/must-not-render-undecided.md
+skills/one-page-report/evals/undecided-options/prompt.md
+skills/one-page-report/references/skeleton.html
+skills/one-page-report/scripts/check_page.py
+skills/report-and-verification/LICENSE
+skills/report-and-verification/NOTICE
+skills/report-and-verification/SKILL.md
+skills/report-and-verification/evals/artifact-missing/graders/must-not-verify.md
+skills/report-and-verification/evals/artifact-missing/prompt.md
+skills/report-and-verification/evals/cases.json
+skills/report-and-verification/evals/grader.md
+skills/report-and-verification/references/artifact-consistency.md
+skills/report-and-verification/references/decision-grade-verification.md
+skills/skill-doctor/SKILL.md
+skills/skill-workflow-builder/LICENSE
+skills/skill-workflow-builder/NOTICE
+skills/skill-workflow-builder/SKILL.md
+skills/skill-workflow-builder/evals/cases.json
+skills/skill-workflow-builder/evals/grader.md
+skills/skill-workflow-builder/evals/one-off/graders/must-not-create.md
+skills/skill-workflow-builder/evals/one-off/prompt.md
+skills/team-delivery-review/SKILL.md
+skills/team-delivery-review/evals/accept-the-doc/graders/must-not-accept-and-must-not-fix.md
+skills/team-delivery-review/evals/accept-the-doc/prompt.md
+skills/team-delivery-review/evals/post-claim-change/graders/must-expire-old-pass.md
+skills/team-delivery-review/evals/post-claim-change/prompt.md
+skills/team-delivery-review/evals/runtime-behind-remote/graders/must-separate-runtime.md
+skills/team-delivery-review/evals/runtime-behind-remote/prompt.md
+skills/team-delivery-review/evals/stale-handoff/README.md
+skills/team-delivery-review/evals/stale-handoff/graders/four-rules.md
+skills/team-delivery-review/evals/stale-handoff/prompt.md
+skills/team-delivery-review/evals/stale-pass-new-artifact/graders/must-not-reuse-pass.md
+skills/team-delivery-review/evals/stale-pass-new-artifact/prompt.md
+skills/team-weekly-review/SKILL.md
+skills/team-weekly-review/evals/missing-optional-sources/graders/must-show-unavailable.md
+skills/team-weekly-review/evals/missing-optional-sources/prompt.md
+skills/team-weekly-review/evals/split-environments/graders/must-not-merge-views.md
+skills/team-weekly-review/evals/split-environments/prompt.md
+tests/test_validate_plugin.py""".splitlines())
+ALLOWED_EXACT_FILES = REQUIRED_FILES | {
+    ".gitignore",
+    ".github/workflows/plugin-validation.yml",
+    "scripts/validate_plugin.py",
+    "tests/test_validate_plugin.py",
+}
+ALLOWED_SUFFIXES = {".md", ".json", ".py", ".html", ".toml", ".yaml", ".yml", ".txt", ".csv"}
+FORBIDDEN_DIRECTORIES = {"data", "dataset", "corpus", "index", "indexes", "cache", ".cache", ".venv", "venv", "node_modules", "__pycache__"}
+FORBIDDEN_SUFFIXES = {".db", ".sqlite", ".faiss", ".npy", ".npz", ".pkl", ".pickle", ".pt", ".onnx", ".bin"}
+ALLOWED_PLUGIN_FIELDS = {"name", "version", "description", "author", "keywords", "skills", "agents", "license"}
+ALLOWED_MARKETPLACE_FIELDS = {"name", "description", "owner", "plugins"}
+ALLOWED_MARKETPLACE_ENTRY_FIELDS = {"name", "source", "description"}
+EXTERNAL_SOURCE_FIELDS = {"source", "repo", "sha"}
+REPOSITORY_COMPONENT = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
+EXPECTED_AGENT_FRONTMATTER = """---
+name: skill-auditor
+description: 掃使用者的 skill 目錄下所有 skill 的斷引用、硬編絕對路徑、description 截斷與 provenance 缺漏，回報結構化清單。**唯讀，不改檔。** 需要一次讀很多檔案時派給它，避免塞爆主對話。
+tools:
+  - Read
+  - Grep
+  - Glob
+---
+"""
+
+
+def load_json(root: Path, relative_path: str, problems: list[str]) -> dict | None:
+    path = root / relative_path
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        problems.append(f"missing required file: {relative_path}")
+        return None
+    except json.JSONDecodeError as error:
+        problems.append(f"{relative_path} must be valid JSON: {error.msg}")
+        return None
+    except (UnicodeDecodeError, OSError) as error:
+        problems.append(f"{relative_path} must be valid JSON: {error}")
+        return None
+    if not isinstance(value, dict):
+        problems.append(f"{relative_path} must contain a JSON object")
+        return None
+    return value
+
+
+def check_named_metadata(value: object, label: str, problems: list[str]) -> None:
+    if not isinstance(value, dict) or not isinstance(value.get("name"), str) or not value["name"].strip():
+        problems.append(f"{label} must contain a non-empty name")
+        return
+    for key, field in value.items():
+        if not isinstance(field, str) or not field.strip():
+            problems.append(f"{label}.{key} must be a non-empty string")
+
+
+def check_manifest_paths(root: Path, plugin: dict, marketplace: dict, problems: list[str]) -> None:
+    for key in sorted(set(plugin) - ALLOWED_PLUGIN_FIELDS):
+        problems.append(f"unsupported plugin.json field: {key}")
+    if plugin.get("name") != "patrick-agent":
+        problems.append("plugin.json name must be 'patrick-agent'")
+    if not isinstance(plugin.get("version"), str) or not plugin["version"].strip():
+        problems.append("plugin.json version must be a non-empty string")
+    if not isinstance(plugin.get("description"), str) or not plugin["description"].strip():
+        problems.append("plugin.json description must be a non-empty string")
+    if plugin.get("license") != "Apache-2.0":
+        problems.append("plugin.json license must be 'Apache-2.0'")
+    check_named_metadata(plugin.get("author"), "plugin.json author", problems)
+    keywords = plugin.get("keywords")
+    if not isinstance(keywords, list) or not keywords or any(not isinstance(keyword, str) or not keyword.strip() for keyword in keywords):
+        problems.append("plugin.json keywords must be a non-empty list of strings")
+    expected_paths = {"skills": ["./skills"], "agents": ["./agents/skill-auditor.md"]}
+    for key, expected in expected_paths.items():
+        entries = plugin.get(key)
+        if isinstance(entries, list):
+            for entry in entries:
+                if not isinstance(entry, str) or not entry.startswith("./"):
+                    problems.append(f"plugin.json {key} has an invalid local path: {entry!r}")
+                    continue
+                target = (root / entry[2:]).resolve()
+                try:
+                    target.relative_to(root)
+                except ValueError:
+                    problems.append(f"plugin.json {key} escapes payload root: {entry}")
+        if entries != expected:
+            problems.append(f"plugin.json {key} must equal {expected}")
+            continue
+        for entry in entries:
+            target = (root / entry[2:]).resolve()
+            if not target.exists():
+                problems.append(f"plugin.json declares a missing path: {entry[2:]}")
+
+    for key in sorted(set(marketplace) - ALLOWED_MARKETPLACE_FIELDS):
+        problems.append(f"unsupported marketplace.json field: {key}")
+    if not isinstance(marketplace.get("name"), str) or not marketplace["name"]:
+        problems.append("marketplace.json name must be a non-empty string")
+    if not isinstance(marketplace.get("description"), str) or not marketplace["description"].strip():
+        problems.append("marketplace.json description must be a non-empty string")
+    check_named_metadata(marketplace.get("owner"), "marketplace.json owner", problems)
+
+    plugins = marketplace.get("plugins")
+    if not isinstance(plugins, list):
+        problems.append("marketplace.json plugins must be a list")
+        return
+    local_plugins = []
+    plugin_names: set[str] = set()
+    for entry in plugins:
+        if not isinstance(entry, dict):
+            problems.append("marketplace.json plugins entries must be objects")
+            continue
+        for key in sorted(set(entry) - ALLOWED_MARKETPLACE_ENTRY_FIELDS):
+            problems.append(f"unsupported marketplace.json plugin entry field: {key}")
+        name, source = entry.get("name"), entry.get("source")
+        if not isinstance(name, str) or not name:
+            problems.append("marketplace.json plugin entry must have a non-empty name")
+            continue
+        if name in plugin_names:
+            problems.append(f"marketplace.json plugin names must be unique: {name!r}")
+        plugin_names.add(name)
+        if "description" in entry and (not isinstance(entry["description"], str) or not entry["description"].strip()):
+            problems.append(f"marketplace.json plugin entry description must be a non-empty string: {name!r}")
+        if isinstance(source, str):
+            local_plugins.append(entry)
+            if source != "./":
+                problems.append(f"marketplace.json has an unsupported local source: {source!r}")
+            elif not (root / ".claude-plugin" / "plugin.json").is_file():
+                problems.append("marketplace.json root source is missing .claude-plugin/plugin.json")
+            continue
+        if not isinstance(source, dict):
+            problems.append("marketplace.json external source must be a GitHub source object")
+            continue
+        repo, sha = source.get("repo"), source.get("sha")
+        repo_parts = repo.split("/") if isinstance(repo, str) else []
+        valid_repo = len(repo_parts) == 2 and all(
+            part not in {".", ".."} and REPOSITORY_COMPONENT.fullmatch(part)
+            for part in repo_parts
+        )
+        if set(source) != EXTERNAL_SOURCE_FIELDS or source.get("source") != "github" or not valid_repo or not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha):
+            problems.append("marketplace.json external source must have github, owner/repo, and a 40-character SHA")
+    if len(local_plugins) != 1 or local_plugins[0].get("name") != "patrick-agent" or local_plugins[0].get("source") != "./":
+        problems.append("marketplace.json must declare exactly one patrick-agent plugin with source './'")
+
+
+def check_agent_contract(root: Path, problems: list[str]) -> None:
+    path = root / "agents" / "skill-auditor.md"
+    try:
+        contents = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        problems.append(f"skill-auditor agent must be readable UTF-8: {error}")
+        return
+    if not contents.startswith(EXPECTED_AGENT_FRONTMATTER):
+        problems.append("skill-auditor agent frontmatter must match the shipped read-only contract")
+
+
+def is_allowed(relative: Path) -> bool:
+    text = relative.as_posix()
+    if text in ALLOWED_EXACT_FILES:
+        return True
+    if not relative.parts or relative.parts[0] not in {"skills", "portfolio"}:
+        return False
+    return relative.suffix in ALLOWED_SUFFIXES or relative.name in {"LICENSE", "NOTICE"}
+
+
+def tracked_payload_entries(root: Path) -> list[tuple[str, Path]] | None:
+    """Return Git-tracked payload paths when Git is available, otherwise None.
+
+    A release checkout is a Git worktree, so validating its tracked files avoids
+    local editor artefacts changing the result.  Exported plugin directories
+    remain supported through the filesystem fallback.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "-s", "-z"],
+            capture_output=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        return None
+    if result.returncode != 0:
+        return None
+    try:
+        git_root = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            check=True,
+            text=True,
+        ).stdout.strip()
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return None
+    if Path(git_root).resolve() != root:
+        return None
+    entries: list[tuple[str, Path]] = []
+    for item in result.stdout.decode("utf-8").split("\0"):
+        if not item:
+            continue
+        try:
+            metadata, relative_text = item.split("\t", 1)
+            mode, _, stage = metadata.split()
+        except ValueError:
+            return None
+        entries.append((mode if stage == "0" else f"unmerged-stage-{stage}", Path(relative_text)))
+    return entries
+
+
+def check_payload(root: Path, problems: list[str], tracked_entries: list[tuple[str, Path]] | None) -> None:
+    total_size = 0
+    entries = ((None, path.relative_to(root)) for path in root.rglob("*")) if tracked_entries is None else tracked_entries
+    for mode, relative in sorted(entries, key=lambda entry: entry[1].as_posix()):
+        path = root / relative
+        relative = path.relative_to(root)
+        if relative.parts and relative.parts[0] == ".git":
+            continue
+        if ".git" in relative.parts:
+            problems.append(f"nested .git directory is not allowed in payload: {relative.as_posix()}")
+            continue
+        if mode is not None and mode not in {"100644", "100755"}:
+            problems.append(f"unsupported Git entry mode {mode}: {relative.as_posix()}")
+            continue
+        if mode is not None and not path.is_file():
+            problems.append(f"tracked payload file is missing from working tree: {relative.as_posix()}")
+            continue
+        if path.is_symlink():
+            problems.append(f"symbolic link is not allowed in payload: {relative.as_posix()}")
+            continue
+        if path.is_dir() and path.name == "__pycache__":
+            continue
+        if path.is_file() and "__pycache__" in relative.parts and path.suffix == ".pyc" and tracked_entries is None:
+            continue
+        if any(part.lower() in FORBIDDEN_DIRECTORIES for part in relative.parts):
+            problems.append(f"forbidden payload directory: {relative.as_posix()}")
+            continue
+        if not path.is_file():
+            continue
+        if path.suffix.lower() in FORBIDDEN_SUFFIXES:
+            problems.append(f"forbidden payload file type: {relative.as_posix()}")
+            continue
+        if not is_allowed(relative):
+            problems.append(f"unknown payload path or file type: {relative.as_posix()}")
+            continue
+        size = path.stat().st_size
+        total_size += size
+        if size > MAX_FILE_BYTES:
+            problems.append(f"single-file size exceeds {MAX_FILE_BYTES} bytes: {relative.as_posix()} ({size})")
+    if total_size > MAX_TOTAL_BYTES:
+        problems.append(f"total size exceeds {MAX_TOTAL_BYTES} bytes: {total_size}")
+
+
+def validate(root: Path) -> list[str]:
+    root = root.resolve()
+    problems: list[str] = []
+    if not root.is_dir():
+        return [f"plugin root does not exist: {root}"]
+    tracked_entries = tracked_payload_entries(root)
+    tracked_paths = {relative.as_posix() for _, relative in tracked_entries} if tracked_entries is not None else None
+    filesystem_paths = {
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*")
+        if path.is_file()
+        and ".git" not in path.relative_to(root).parts
+        and not ("__pycache__" in path.relative_to(root).parts and path.suffix == ".pyc")
+    }
+    release_paths = tracked_paths if tracked_paths is not None else filesystem_paths
+    for relative in sorted(EXPECTED_TRACKED_PATHS):
+        if not (root / relative).is_file():
+            problems.append(f"missing expected release path: {relative}")
+    for relative in sorted(EXPECTED_TRACKED_PATHS - release_paths):
+        problems.append(f"missing expected release path: {relative}")
+    for relative in sorted(release_paths - EXPECTED_TRACKED_PATHS):
+        problems.append(f"unexpected release path: {relative}")
+    for relative in sorted(REQUIRED_FILES):
+        if not (root / relative).is_file() or (tracked_paths is not None and relative not in tracked_paths):
+            problems.append(f"missing required file: {relative}")
+    plugin = load_json(root, ".claude-plugin/plugin.json", problems)
+    marketplace = load_json(root, ".claude-plugin/marketplace.json", problems)
+    if plugin is not None and marketplace is not None:
+        check_manifest_paths(root, plugin, marketplace, problems)
+    check_agent_contract(root, problems)
+    skills_path = root / "skills"
+    actual_skills = {path.name for path in skills_path.iterdir() if path.is_dir()} if skills_path.is_dir() else set()
+    if actual_skills != EXPECTED_SKILLS:
+        problems.append(f"Skill set mismatch: expected {sorted(EXPECTED_SKILLS)}, got {sorted(actual_skills)}")
+    for skill in sorted(EXPECTED_SKILLS):
+        entry = skills_path / skill / "SKILL.md"
+        relative_entry = f"skills/{skill}/SKILL.md"
+        if not entry.is_file() or (tracked_paths is not None and relative_entry not in tracked_paths):
+            problems.append(f"missing required Skill entry: skills/{skill}/SKILL.md")
+    check_payload(root, problems, tracked_entries)
+    return problems
+
+
+def main() -> int:
+    if len(sys.argv) > 2:
+        print("usage: validate_plugin.py [plugin-root]", file=sys.stderr)
+        return 2
+    root = Path(sys.argv[1]).resolve() if len(sys.argv) == 2 else Path.cwd()
+    problems = validate(root)
+    if problems:
+        for problem in problems:
+            print(f"ERROR: {problem}", file=sys.stderr)
+        return 1
+    print(f"plugin-validation passed: {root}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

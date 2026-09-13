@@ -78,7 +78,7 @@
 
 **證據層級：**`team-delivery-review` 與 `team-weekly-review` 的 0.5.1 行為結果來自 Patrick 在本次對話提供、由 Codex 人工判讀的 Claude CLI 截圖；原始截圖與 transcript／log **未進版控，也不隨 plugin 發布**。因此這是人工驗收紀錄，不是只靠 repo 就能獨立重放的證物。
 
-**L2 現況：四支新增／重建項目已於 2026-09-08 在空白、read-only 目錄以自包含案例重跑。首輪 `skill-workflow-builder` 實際誤路由到私人 `create-good-skills`，不算通過；將課程版設為 explicit-only 後的第二輪才正確載入新 Skill。`plugin eval` 在當前 Claude CLI 仍只回報 early access；`team-delivery-review` 與 `team-weekly-review` 的 0.5.1 證據改由兩個全新 Claude session 直接載入本機候選 plugin，Patrick 提供的畫面均顯示 `patrick-agent:<skill>` namespace。`build_plugin.py --check` 另證明受測正本與 plugin 副本同步。**
+**L2 現況：四支新增／重建項目已於 2026-09-08 在空白、read-only 目錄以自包含案例重跑。首輪 `skill-workflow-builder` 實際誤路由到私人 `create-good-skills`，不算通過；將課程版設為 explicit-only 後的第二輪才正確載入新 Skill。`plugin eval` 在當前 Claude CLI 仍只回報 early access；`team-delivery-review` 與 `team-weekly-review` 的 0.5.1 證據改由兩個全新 Claude session 直接載入本機候選 plugin，Patrick 提供的畫面均顯示 `patrick-agent:<skill>` namespace。公開 payload 的完整性由 `scripts/validate_plugin.py` 與其合約測試驗證。**
 
 🟡 `feature-proposal-planning` **主 guard 擋住了**（先訪談四題才動手，把 E4 的數字
 排除在所有推論之外，競品那條整段刪掉），**但必要條件缺一**：

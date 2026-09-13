@@ -4,23 +4,9 @@ LipiD 的產品工作方法 skill 包，給 Claude Code 用。
 
 ## 安裝
 
-### 0. 前置條件（三項，缺一個就裝不起來）
+### 0. 前置條件
 
-> 🔴 **這一節是 2026-09-07 在一台乾淨機器上實測補的。**
-> 原本的安裝說明是從「已經有 Claude Code」開始寫的 ——
-> 因為寫的人機器上早就有了。**走到第三步才發現撞到三個沒寫的東西。**
-
-**① 你的 GitHub 帳號要先被邀請成這個 repo 的 collaborator。**
-這是私有 repo，沒有權限時 GitHub 回的是 **404 不是 403** ——
-錯誤訊息會看起來像「repo 不存在」，而不是「你沒有權限」。
-
-確認你是用哪個帳號：
-
-```bash
-gh auth status
-```
-
-**② 要有 Node.js 與 Claude Code CLI。**
+**要有 Node.js 與 Claude Code CLI。**
 
 ```bash
 npm install -g @anthropic-ai/claude-code
@@ -31,7 +17,8 @@ claude --version
 **但 CLI 裝完之後桌面版讀得到**（2026-09-07 實測，兩邊都看得見），
 所以「用 CLI 裝、平常用桌面版」是可行的。
 
-**③ 要登入 GitHub。** clone 走 HTTPS，用的是這台機器的 git 認證：
+這是公開 repo；一般安裝不需要 collaborator 權限。若你的環境尚未登入 GitHub，
+可選擇登入以使用其他 GitHub 功能：
 
 ```bash
 gh auth login
@@ -52,7 +39,7 @@ claude plugin list
 ### 2. 確認它真的能用
 
 裝得起來 ≠ 能用。三層驗收見 **`ACCEPTANCE-LEVELS.md`**，
-最少做第一層：打 `/patrick-agent` 看五支在不在。
+最少做第一層：打 `/patrick-agent` 確認七支 skill 都在。
 
 ## 裝完之後怎麼用
 
@@ -73,6 +60,8 @@ claude plugin list
 | `skill-workflow-builder` | 以 baseline 與 forward test 建立或更新最小 Skill；一次性任務不硬建 |
 | `skill-doctor` | 唯讀掃描 Skill 的斷引用、路徑耦合、description 截斷與 provenance |
 | `one-page-report` | 產出單檔、自包含、可列印的一頁報告，並附交付前檢查器 |
+
+另附唯讀的 `skill-auditor` agent；payload 以 Apache-2.0 授權，詳見 [LICENSE](LICENSE)。每次 PR 都會在 Linux、macOS 與 Windows 執行 payload 驗證與 contract tests。
 
 ## 上游 plugin：只給地址，不複製
 
@@ -111,21 +100,19 @@ claude plugin marketplace add anthropics/skills
 > 不能直接寫進本包的 `plugins` 清單。已於 2026-09-04 確認
 > `skills/skill-creator` 路徑存在。
 
-## ⚠️ 這個 repo 是產生出來的，不要直接編輯
+## 維護方式
 
-`skills/` 底下的內容是從作者的私有 repo **產生**出來的，
-複製時會做環境淨化（把指向作者本機的引用改寫成對方看得懂的說明）。
-
-**在這裡改會在下次 build 被覆蓋。** 有問題或想改內容，直接跟作者說。
+這個 repo 是可直接維護與發佈的公開 plugin payload。修改 `skills/`、文件或 manifest 時，
+請透過 PR，並通過 `scripts/validate_plugin.py`、合約測試與 plugin manifest 驗證。
 
 
 ---
 
-## 安裝實績（2026-08-28 首次跨機器驗證）
+## 歷史安裝實績（private repo 時期）
 
 | 通路 | 狀態 |
 |---|---|
-| `codex plugin marketplace add lys1437-hub/patrick-agent-plugin` | ✅ **可行** —— private repo 會沿用對方的 `gh` 認證 |
+| `codex plugin marketplace add lys1437-hub/patrick-agent-plugin` | ✅ **可行** —— 當時 private repo 會沿用對方的 `gh` 認證 |
 | `claude plugin marketplace add <本機路徑>` | ✅ 已驗 |
 | Claude Code 對 private GitHub repo | ✅ **2026-09-04 實測通過** —— 見下 |
 
@@ -158,7 +145,7 @@ plugin cache 一份）。plugin 端有 `plugin:skill` 命名空間所以不是�
 GitHub 不支援個人 repo 的細分 collaborator 權限（read／triage／write 是 org 功能）。
 所以受邀者拿到的是 **write**，`gh api ... -f permission=pull` 會回 204 但沒有效果。
 
-**風險已評估為趨近零**：內容是 `build_plugin.py` 產生的、下次 build 就覆蓋、不含機密。
+**風險已評估為趨近零**：公開 payload 不含機密，並由 PR 與驗證流程保護。
 真要唯讀只能建 GitHub Organization。
 
 ### 桌面版沒有 `/plugin`
