@@ -143,6 +143,28 @@ class PluginValidationTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("unsupported Git entry mode 160000", result.stderr)
 
+    def test_validator_rejects_unmerged_git_index_stage(self) -> None:
+        root = self.make_plugin()
+        subprocess.run(["git", "init", "-q", str(root)], check=True)
+        subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+        blob = subprocess.run(
+            ["git", "-C", str(root), "hash-object", "-w", "README.md"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        subprocess.run(
+            ["git", "-C", str(root), "update-index", "--index-info"],
+            input=f"100644 {blob} 1\tREADME.md\n",
+            check=True,
+            text=True,
+        )
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unsupported Git entry mode unmerged-stage-1", result.stderr)
+
     def test_skill_set_mismatch_fails(self) -> None:
         root = self.make_plugin()
         (root / "skills" / "one-page-report").rename(root / "skills" / "renamed-skill")

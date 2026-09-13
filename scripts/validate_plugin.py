@@ -286,9 +286,7 @@ def tracked_payload_entries(root: Path) -> list[tuple[str, Path]] | None:
             mode, _, stage = metadata.split()
         except ValueError:
             return None
-        if stage != "0":
-            return None
-        entries.append((mode, Path(relative_text)))
+        entries.append((mode if stage == "0" else f"unmerged-stage-{stage}", Path(relative_text)))
     return entries
 
 
