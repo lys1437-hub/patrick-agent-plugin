@@ -155,7 +155,7 @@ class PluginValidationTests(unittest.TestCase):
             text=True,
         ).stdout.strip()
         subprocess.run(
-            ["git", "-C", str(root), "update-index", "--index-info"],
+            ["git", "-C", str(root), "update-index", "--add", "--index-info"],
             input=f"100644 {blob} 1\tREADME.md\n",
             check=True,
             text=True,
