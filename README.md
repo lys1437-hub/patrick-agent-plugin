@@ -160,7 +160,7 @@ plugin cache 一份）。plugin 端有 `plugin:skill` 命名空間所以不是�
 GitHub 不支援個人 repo 的細分 collaborator 權限（read／triage／write 是 org 功能）。
 所以受邀者拿到的是 **write**，`gh api ... -f permission=pull` 會回 204 但沒有效果。
 
-**風險已評估為趨近零**：內容是 `build_plugin.py` 產生的、下次 build 就覆蓋、不含機密。
+**風險已評估為趨近零**：公開 payload 不含機密，並由 PR 與驗證流程保護。
 真要唯讀只能建 GitHub Organization。
 
 ### 桌面版沒有 `/plugin`
