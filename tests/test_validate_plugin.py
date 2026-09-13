@@ -10,10 +10,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from scripts.validate_plugin import validate as validate_in_process
 
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = REPO_ROOT / "scripts" / "validate_plugin.py"
 
 
@@ -105,7 +107,7 @@ class PluginValidationTests(unittest.TestCase):
         bytecode = cache / "test_validate_plugin.cpython-313.pyc"
         bytecode.write_bytes(b"bytecode")
         subprocess.run(["git", "init", "-q", str(root)], check=True)
-        subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(root), "add", "-f", "."], check=True)
 
         result = self.validate(root)
 
