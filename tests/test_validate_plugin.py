@@ -147,6 +147,7 @@ class PluginValidationTests(unittest.TestCase):
         root = self.make_plugin()
         subprocess.run(["git", "init", "-q", str(root)], check=True)
         subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(root), "update-index", "--force-remove", "README.md"], check=True)
         blob = subprocess.run(
             ["git", "-C", str(root), "hash-object", "-w", "README.md"],
             check=True,
