@@ -71,6 +71,18 @@ def check_manifest_paths(root: Path, plugin: dict, marketplace: dict, problems: 
         problems.append(f"unsupported plugin.json field: {key}")
     if plugin.get("name") != "patrick-agent":
         problems.append("plugin.json name must be 'patrick-agent'")
+    if not isinstance(plugin.get("version"), str) or not plugin["version"].strip():
+        problems.append("plugin.json version must be a non-empty string")
+    if not isinstance(plugin.get("description"), str) or not plugin["description"].strip():
+        problems.append("plugin.json description must be a non-empty string")
+    if plugin.get("license") != "Apache-2.0":
+        problems.append("plugin.json license must be 'Apache-2.0'")
+    author = plugin.get("author")
+    if not isinstance(author, dict) or not isinstance(author.get("name"), str) or not author["name"].strip():
+        problems.append("plugin.json author must contain a non-empty name")
+    keywords = plugin.get("keywords")
+    if not isinstance(keywords, list) or not keywords or any(not isinstance(keyword, str) or not keyword.strip() for keyword in keywords):
+        problems.append("plugin.json keywords must be a non-empty list of strings")
     expected_paths = {"skills": ["./skills"], "agents": ["./agents/skill-auditor.md"]}
     for key, expected in expected_paths.items():
         entries = plugin.get(key)
@@ -141,6 +153,35 @@ def check_manifest_paths(root: Path, plugin: dict, marketplace: dict, problems: 
         problems.append("marketplace.json must declare exactly one patrick-agent plugin with source './'")
 
 
+def check_agent_contract(root: Path, problems: list[str]) -> None:
+    path = root / "agents" / "skill-auditor.md"
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return
+    if not lines or lines[0] != "---":
+        problems.append("skill-auditor agent must have YAML frontmatter")
+        return
+    try:
+        end = lines.index("---", 1)
+    except ValueError:
+        problems.append("skill-auditor agent must close its YAML frontmatter")
+        return
+    metadata = lines[1:end]
+    if "name: skill-auditor" not in metadata:
+        problems.append("skill-auditor agent name must be 'skill-auditor'")
+    if not any(line.startswith("description:") and line.removeprefix("description:").strip() for line in metadata):
+        problems.append("skill-auditor agent must have a non-empty description")
+    try:
+        tools_start = metadata.index("tools:")
+    except ValueError:
+        problems.append("skill-auditor agent must declare read-only tools")
+        return
+    tools = {line.strip().removeprefix("- ").strip() for line in metadata[tools_start + 1:] if line.startswith("  - ")}
+    if tools != {"Read", "Grep", "Glob"}:
+        problems.append("skill-auditor agent tools must be exactly Read, Grep, and Glob")
+
+
 def is_allowed(relative: Path) -> bool:
     text = relative.as_posix()
     if text in ALLOWED_EXACT_FILES:
@@ -166,6 +207,17 @@ def tracked_payload_paths(root: Path) -> list[Path] | None:
     except FileNotFoundError:
         return None
     if result.returncode != 0:
+        return None
+    try:
+        git_root = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            check=True,
+            text=True,
+        ).stdout.strip()
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return None
+    if Path(git_root).resolve() != root:
         return None
     return [root / Path(item) for item in result.stdout.decode("utf-8").split("\0") if item]
 
@@ -219,6 +271,7 @@ def validate(root: Path) -> list[str]:
     marketplace = load_json(root, ".claude-plugin/marketplace.json", problems)
     if plugin is not None and marketplace is not None:
         check_manifest_paths(root, plugin, marketplace, problems)
+    check_agent_contract(root, problems)
     skills_path = root / "skills"
     actual_skills = {path.name for path in skills_path.iterdir() if path.is_dir()} if skills_path.is_dir() else set()
     if actual_skills != EXPECTED_SKILLS:

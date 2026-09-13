@@ -128,6 +128,40 @@ class PluginValidationTests(unittest.TestCase):
 
         self.assertIn("skill-auditor", contents)
 
+    def test_validator_falls_back_when_plugin_is_nested_in_a_git_repository(self) -> None:
+        root = self.make_plugin()
+        subprocess.run(["git", "init", "-q", str(root.parent)], check=True)
+        (root / ".env").write_text("must be scanned", encoding="utf-8")
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unknown payload path", result.stderr)
+
+    def test_plugin_manifest_rejects_invalid_release_metadata(self) -> None:
+        root = self.make_plugin()
+        path = root / ".claude-plugin" / "plugin.json"
+        plugin = json.loads(path.read_text(encoding="utf-8"))
+        plugin["version"] = {"not": "a string"}
+        plugin["license"] = False
+        path.write_text(json.dumps(plugin), encoding="utf-8")
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("plugin.json version", result.stderr)
+        self.assertIn("plugin.json license", result.stderr)
+
+    def test_agent_contract_rejects_write_capabilities(self) -> None:
+        root = self.make_plugin()
+        path = root / "agents" / "skill-auditor.md"
+        path.write_text(path.read_text(encoding="utf-8").replace("  - Glob", "  - Glob\n  - Bash"), encoding="utf-8")
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("tools must be exactly", result.stderr)
+
     def test_in_process_validation_resolves_root_before_containment_checks(self) -> None:
         root = self.make_plugin()
         alias = root.parent / "plugin-alias"
