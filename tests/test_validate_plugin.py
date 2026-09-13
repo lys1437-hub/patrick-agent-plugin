@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -26,7 +27,7 @@ class PluginValidationTests(unittest.TestCase):
 
     def validate(self, root: Path) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
-            ["python3", str(VALIDATOR), str(root)],
+            [sys.executable, str(VALIDATOR), str(root)],
             check=False,
             capture_output=True,
             text=True,

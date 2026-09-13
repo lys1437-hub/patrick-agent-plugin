@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -148,6 +149,16 @@ def is_allowed(relative: Path) -> bool:
     return relative.suffix in ALLOWED_SUFFIXES or relative.name in {"LICENSE", "NOTICE"}
 
 
+def is_tracked(root: Path, relative: Path) -> bool:
+    result = subprocess.run(
+        ["git", "-C", str(root), "ls-files", "--error-unmatch", "--", relative.as_posix()],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    return result.returncode == 0
+
+
 def check_payload(root: Path, problems: list[str]) -> None:
     total_size = 0
     for path in sorted(root.rglob("*")):
@@ -162,7 +173,7 @@ def check_payload(root: Path, problems: list[str]) -> None:
             continue
         if path.is_dir() and path.name == "__pycache__":
             continue
-        if path.is_file() and "__pycache__" in relative.parts and path.suffix == ".pyc":
+        if path.is_file() and "__pycache__" in relative.parts and path.suffix == ".pyc" and not is_tracked(root, relative):
             continue
         if any(part.lower() in FORBIDDEN_DIRECTORIES for part in relative.parts):
             problems.append(f"forbidden payload directory: {relative.as_posix()}")
