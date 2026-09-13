@@ -295,7 +295,8 @@ def validate(root: Path) -> list[str]:
         problems.append(f"Skill set mismatch: expected {sorted(EXPECTED_SKILLS)}, got {sorted(actual_skills)}")
     for skill in sorted(EXPECTED_SKILLS):
         entry = skills_path / skill / "SKILL.md"
-        if not entry.is_file():
+        relative_entry = f"skills/{skill}/SKILL.md"
+        if not entry.is_file() or (tracked_paths is not None and relative_entry not in tracked_paths):
             problems.append(f"missing required Skill entry: skills/{skill}/SKILL.md")
     check_payload(root, problems, tracked_entries)
     return problems

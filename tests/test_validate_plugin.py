@@ -77,6 +77,17 @@ class PluginValidationTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("missing required file: LICENSE", result.stderr)
 
+    def test_skill_entry_must_be_in_the_git_release_inventory(self) -> None:
+        root = self.make_plugin()
+        subprocess.run(["git", "init", "-q", str(root)], check=True)
+        subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(root), "rm", "--cached", "skills/skill-doctor/SKILL.md"], check=True, capture_output=True)
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("missing required Skill entry: skills/skill-doctor/SKILL.md", result.stderr)
+
     def test_validator_rejects_gitlink_in_release_inventory(self) -> None:
         root = self.make_plugin()
         subprocess.run(["git", "init", "-q", str(root)], check=True)
