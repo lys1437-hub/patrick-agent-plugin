@@ -4,23 +4,9 @@ LipiD 的產品工作方法 skill 包，給 Claude Code 用。
 
 ## 安裝
 
-### 0. 前置條件（三項，缺一個就裝不起來）
+### 0. 前置條件
 
-> 🔴 **這一節是 2026-09-07 在一台乾淨機器上實測補的。**
-> 原本的安裝說明是從「已經有 Claude Code」開始寫的 ——
-> 因為寫的人機器上早就有了。**走到第三步才發現撞到三個沒寫的東西。**
-
-**① 你的 GitHub 帳號要先被邀請成這個 repo 的 collaborator。**
-這是私有 repo，沒有權限時 GitHub 回的是 **404 不是 403** ——
-錯誤訊息會看起來像「repo 不存在」，而不是「你沒有權限」。
-
-確認你是用哪個帳號：
-
-```bash
-gh auth status
-```
-
-**② 要有 Node.js 與 Claude Code CLI。**
+**要有 Node.js 與 Claude Code CLI。**
 
 ```bash
 npm install -g @anthropic-ai/claude-code
@@ -31,7 +17,8 @@ claude --version
 **但 CLI 裝完之後桌面版讀得到**（2026-09-07 實測，兩邊都看得見），
 所以「用 CLI 裝、平常用桌面版」是可行的。
 
-**③ 要登入 GitHub。** clone 走 HTTPS，用的是這台機器的 git 認證：
+這是公開 repo；一般安裝不需要 collaborator 權限。若你的環境尚未登入 GitHub，
+可選擇登入以使用其他 GitHub 功能：
 
 ```bash
 gh auth login
@@ -121,11 +108,11 @@ claude plugin marketplace add anthropics/skills
 
 ---
 
-## 安裝實績（2026-08-28 首次跨機器驗證）
+## 歷史安裝實績（private repo 時期）
 
 | 通路 | 狀態 |
 |---|---|
-| `codex plugin marketplace add lys1437-hub/patrick-agent-plugin` | ✅ **可行** —— private repo 會沿用對方的 `gh` 認證 |
+| `codex plugin marketplace add lys1437-hub/patrick-agent-plugin` | ✅ **可行** —— 當時 private repo 會沿用對方的 `gh` 認證 |
 | `claude plugin marketplace add <本機路徑>` | ✅ 已驗 |
 | Claude Code 對 private GitHub repo | ✅ **2026-09-04 實測通過** —— 見下 |
 
