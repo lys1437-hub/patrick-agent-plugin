@@ -75,6 +75,15 @@ def load_json(root: Path, relative_path: str, problems: list[str]) -> dict | Non
     return value
 
 
+def check_named_metadata(value: object, label: str, problems: list[str]) -> None:
+    if not isinstance(value, dict) or not isinstance(value.get("name"), str) or not value["name"].strip():
+        problems.append(f"{label} must contain a non-empty name")
+        return
+    for key, field in value.items():
+        if not isinstance(field, str) or not field.strip():
+            problems.append(f"{label}.{key} must be a non-empty string")
+
+
 def check_manifest_paths(root: Path, plugin: dict, marketplace: dict, problems: list[str]) -> None:
     for key in sorted(set(plugin) - ALLOWED_PLUGIN_FIELDS):
         problems.append(f"unsupported plugin.json field: {key}")
@@ -86,11 +95,7 @@ def check_manifest_paths(root: Path, plugin: dict, marketplace: dict, problems: 
         problems.append("plugin.json description must be a non-empty string")
     if plugin.get("license") != "Apache-2.0":
         problems.append("plugin.json license must be 'Apache-2.0'")
-    author = plugin.get("author")
-    if not isinstance(author, dict) or not isinstance(author.get("name"), str) or not author["name"].strip():
-        problems.append("plugin.json author must contain a non-empty name")
-    elif "email" in author and (not isinstance(author["email"], str) or not author["email"].strip()):
-        problems.append("plugin.json author.email must be a non-empty string when present")
+    check_named_metadata(plugin.get("author"), "plugin.json author", problems)
     keywords = plugin.get("keywords")
     if not isinstance(keywords, list) or not keywords or any(not isinstance(keyword, str) or not keyword.strip() for keyword in keywords):
         problems.append("plugin.json keywords must be a non-empty list of strings")
@@ -119,9 +124,9 @@ def check_manifest_paths(root: Path, plugin: dict, marketplace: dict, problems: 
         problems.append(f"unsupported marketplace.json field: {key}")
     if not isinstance(marketplace.get("name"), str) or not marketplace["name"]:
         problems.append("marketplace.json name must be a non-empty string")
-    owner = marketplace.get("owner")
-    if not isinstance(owner, dict) or not isinstance(owner.get("name"), str) or not owner["name"]:
-        problems.append("marketplace.json owner must contain a non-empty name")
+    if not isinstance(marketplace.get("description"), str) or not marketplace["description"].strip():
+        problems.append("marketplace.json description must be a non-empty string")
+    check_named_metadata(marketplace.get("owner"), "marketplace.json owner", problems)
 
     plugins = marketplace.get("plugins")
     if not isinstance(plugins, list):
@@ -142,6 +147,8 @@ def check_manifest_paths(root: Path, plugin: dict, marketplace: dict, problems: 
         if name in plugin_names:
             problems.append(f"marketplace.json plugin names must be unique: {name!r}")
         plugin_names.add(name)
+        if "description" in entry and (not isinstance(entry["description"], str) or not entry["description"].strip()):
+            problems.append(f"marketplace.json plugin entry description must be a non-empty string: {name!r}")
         if isinstance(source, str):
             local_plugins.append(entry)
             if source != "./":

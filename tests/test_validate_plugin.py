@@ -164,6 +164,28 @@ class PluginValidationTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("author.email", result.stderr)
 
+    def test_validator_rejects_invalid_manifest_metadata_types(self) -> None:
+        cases = (
+            ("marketplace_description", lambda plugin, marketplace: marketplace.__setitem__("description", {})),
+            ("owner_email", lambda plugin, marketplace: marketplace["owner"].__setitem__("email", 123)),
+            ("entry_description", lambda plugin, marketplace: marketplace["plugins"][0].__setitem__("description", [])),
+            ("author_url", lambda plugin, marketplace: plugin["author"].__setitem__("url", False)),
+        )
+        for name, mutate in cases:
+            with self.subTest(name=name):
+                root = self.make_plugin()
+                plugin_path = root / ".claude-plugin" / "plugin.json"
+                marketplace_path = root / ".claude-plugin" / "marketplace.json"
+                plugin = json.loads(plugin_path.read_text(encoding="utf-8"))
+                marketplace = json.loads(marketplace_path.read_text(encoding="utf-8"))
+                mutate(plugin, marketplace)
+                plugin_path.write_text(json.dumps(plugin), encoding="utf-8")
+                marketplace_path.write_text(json.dumps(marketplace), encoding="utf-8")
+
+                result = self.validate(root)
+
+                self.assertNotEqual(result.returncode, 0)
+
     def test_agent_contract_rejects_write_capabilities(self) -> None:
         root = self.make_plugin()
         path = root / "agents" / "skill-auditor.md"
