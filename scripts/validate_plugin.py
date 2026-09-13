@@ -191,7 +191,7 @@ def is_allowed(relative: Path) -> bool:
     return relative.suffix in ALLOWED_SUFFIXES or relative.name in {"LICENSE", "NOTICE"}
 
 
-def tracked_payload_paths(root: Path) -> list[Path] | None:
+def tracked_payload_entries(root: Path) -> list[tuple[str, Path]] | None:
     """Return Git-tracked payload paths when Git is available, otherwise None.
 
     A release checkout is a Git worktree, so validating its tracked files avoids
@@ -200,7 +200,7 @@ def tracked_payload_paths(root: Path) -> list[Path] | None:
     """
     try:
         result = subprocess.run(
-            ["git", "-C", str(root), "ls-files", "-z"],
+            ["git", "-C", str(root), "ls-files", "-s", "-z"],
             capture_output=True,
             check=False,
         )
@@ -219,26 +219,41 @@ def tracked_payload_paths(root: Path) -> list[Path] | None:
         return None
     if Path(git_root).resolve() != root:
         return None
-    return [root / Path(item) for item in result.stdout.decode("utf-8").split("\0") if item]
+    entries: list[tuple[str, Path]] = []
+    for item in result.stdout.decode("utf-8").split("\0"):
+        if not item:
+            continue
+        try:
+            metadata, relative_text = item.split("\t", 1)
+            mode, _, stage = metadata.split()
+        except ValueError:
+            return None
+        if stage != "0":
+            return None
+        entries.append((mode, Path(relative_text)))
+    return entries
 
 
-def check_payload(root: Path, problems: list[str]) -> None:
+def check_payload(root: Path, problems: list[str], tracked_entries: list[tuple[str, Path]] | None) -> None:
     total_size = 0
-    tracked_paths = tracked_payload_paths(root)
-    paths = root.rglob("*") if tracked_paths is None else tracked_paths
-    for path in sorted(paths):
+    entries = ((None, path.relative_to(root)) for path in root.rglob("*")) if tracked_entries is None else tracked_entries
+    for mode, relative in sorted(entries, key=lambda entry: entry[1].as_posix()):
+        path = root / relative
         relative = path.relative_to(root)
         if relative.parts and relative.parts[0] == ".git":
             continue
         if ".git" in relative.parts:
             problems.append(f"nested .git directory is not allowed in payload: {relative.as_posix()}")
             continue
+        if mode is not None and mode not in {"100644", "100755"}:
+            problems.append(f"unsupported Git entry mode {mode}: {relative.as_posix()}")
+            continue
         if path.is_symlink():
             problems.append(f"symbolic link is not allowed in payload: {relative.as_posix()}")
             continue
         if path.is_dir() and path.name == "__pycache__":
             continue
-        if path.is_file() and "__pycache__" in relative.parts and path.suffix == ".pyc" and tracked_paths is None:
+        if path.is_file() and "__pycache__" in relative.parts and path.suffix == ".pyc" and tracked_entries is None:
             continue
         if any(part.lower() in FORBIDDEN_DIRECTORIES for part in relative.parts):
             problems.append(f"forbidden payload directory: {relative.as_posix()}")
@@ -264,8 +279,10 @@ def validate(root: Path) -> list[str]:
     problems: list[str] = []
     if not root.is_dir():
         return [f"plugin root does not exist: {root}"]
+    tracked_entries = tracked_payload_entries(root)
+    tracked_paths = {relative.as_posix() for _, relative in tracked_entries} if tracked_entries is not None else None
     for relative in sorted(REQUIRED_FILES):
-        if not (root / relative).is_file():
+        if not (root / relative).is_file() or (tracked_paths is not None and relative not in tracked_paths):
             problems.append(f"missing required file: {relative}")
     plugin = load_json(root, ".claude-plugin/plugin.json", problems)
     marketplace = load_json(root, ".claude-plugin/marketplace.json", problems)
@@ -280,7 +297,7 @@ def validate(root: Path) -> list[str]:
         entry = skills_path / skill / "SKILL.md"
         if not entry.is_file():
             problems.append(f"missing required Skill entry: skills/{skill}/SKILL.md")
-    check_payload(root, problems)
+    check_payload(root, problems, tracked_entries)
     return problems
 
 

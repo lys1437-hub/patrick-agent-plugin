@@ -66,6 +66,32 @@ class PluginValidationTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("LICENSE", result.stderr)
 
+    def test_required_file_must_be_in_the_git_release_inventory(self) -> None:
+        root = self.make_plugin()
+        subprocess.run(["git", "init", "-q", str(root)], check=True)
+        subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(root), "rm", "--cached", "LICENSE"], check=True, capture_output=True)
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("missing required file: LICENSE", result.stderr)
+
+    def test_validator_rejects_gitlink_in_release_inventory(self) -> None:
+        root = self.make_plugin()
+        subprocess.run(["git", "init", "-q", str(root)], check=True)
+        subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+        subprocess.run(
+            ["git", "-C", str(root), "update-index", "--add", "--cacheinfo", "160000," + "1" * 40 + ",unexpected-module"],
+            check=True,
+        )
+        (root / "unexpected-module").mkdir()
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unsupported Git entry mode 160000", result.stderr)
+
     def test_skill_set_mismatch_fails(self) -> None:
         root = self.make_plugin()
         (root / "skills" / "one-page-report").rename(root / "skills" / "renamed-skill")
