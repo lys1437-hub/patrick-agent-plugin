@@ -137,6 +137,15 @@ class PluginValidationTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("missing expected release path: skills/one-page-report/references/skeleton.html", result.stderr)
 
+    def test_exported_payload_rejects_unexpected_release_file(self) -> None:
+        root = self.make_plugin()
+        (root / "skills" / "skill-doctor" / "private-notes.md").write_text("not for release\n", encoding="utf-8")
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unexpected release path: skills/skill-doctor/private-notes.md", result.stderr)
+
     def test_validator_rejects_gitlink_in_release_inventory(self) -> None:
         root = self.make_plugin()
         subprocess.run(["git", "init", "-q", str(root)], check=True)

@@ -340,14 +340,21 @@ def validate(root: Path) -> list[str]:
         return [f"plugin root does not exist: {root}"]
     tracked_entries = tracked_payload_entries(root)
     tracked_paths = {relative.as_posix() for _, relative in tracked_entries} if tracked_entries is not None else None
+    filesystem_paths = {
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*")
+        if path.is_file()
+        and ".git" not in path.relative_to(root).parts
+        and not ("__pycache__" in path.relative_to(root).parts and path.suffix == ".pyc")
+    }
+    release_paths = tracked_paths if tracked_paths is not None else filesystem_paths
     for relative in sorted(EXPECTED_TRACKED_PATHS):
         if not (root / relative).is_file():
             problems.append(f"missing expected release path: {relative}")
-    if tracked_paths is not None:
-        for relative in sorted(EXPECTED_TRACKED_PATHS - tracked_paths):
-            problems.append(f"missing expected release path: {relative}")
-        for relative in sorted(tracked_paths - EXPECTED_TRACKED_PATHS):
-            problems.append(f"unexpected release path: {relative}")
+    for relative in sorted(EXPECTED_TRACKED_PATHS - release_paths):
+        problems.append(f"missing expected release path: {relative}")
+    for relative in sorted(release_paths - EXPECTED_TRACKED_PATHS):
+        problems.append(f"unexpected release path: {relative}")
     for relative in sorted(REQUIRED_FILES):
         if not (root / relative).is_file() or (tracked_paths is not None and relative not in tracked_paths):
             problems.append(f"missing required file: {relative}")
