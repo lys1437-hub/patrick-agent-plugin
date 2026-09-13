@@ -340,6 +340,9 @@ def validate(root: Path) -> list[str]:
         return [f"plugin root does not exist: {root}"]
     tracked_entries = tracked_payload_entries(root)
     tracked_paths = {relative.as_posix() for _, relative in tracked_entries} if tracked_entries is not None else None
+    for relative in sorted(EXPECTED_TRACKED_PATHS):
+        if not (root / relative).is_file():
+            problems.append(f"missing expected release path: {relative}")
     if tracked_paths is not None:
         for relative in sorted(EXPECTED_TRACKED_PATHS - tracked_paths):
             problems.append(f"missing expected release path: {relative}")

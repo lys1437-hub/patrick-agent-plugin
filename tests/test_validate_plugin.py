@@ -128,6 +128,15 @@ class PluginValidationTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("missing expected release path: skills/one-page-report/references/skeleton.html", result.stderr)
 
+    def test_exported_payload_rejects_missing_expected_support_file(self) -> None:
+        root = self.make_plugin()
+        (root / "skills" / "one-page-report" / "references" / "skeleton.html").unlink()
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("missing expected release path: skills/one-page-report/references/skeleton.html", result.stderr)
+
     def test_validator_rejects_gitlink_in_release_inventory(self) -> None:
         root = self.make_plugin()
         subprocess.run(["git", "init", "-q", str(root)], check=True)
@@ -147,16 +156,17 @@ class PluginValidationTests(unittest.TestCase):
         root = self.make_plugin()
         subprocess.run(["git", "init", "-q", str(root)], check=True)
         subprocess.run(["git", "-C", str(root), "add", "."], check=True)
-        subprocess.run(["git", "-C", str(root), "update-index", "--force-remove", "README.md"], check=True)
+        unmerged_path = root / "unmerged-stage.txt"
+        unmerged_path.write_text("unmerged index fixture\n", encoding="utf-8")
         blob = subprocess.run(
-            ["git", "-C", str(root), "hash-object", "-w", "README.md"],
+            ["git", "-C", str(root), "hash-object", "-w", str(unmerged_path)],
             check=True,
             capture_output=True,
             text=True,
         ).stdout.strip()
         subprocess.run(
             ["git", "-C", str(root), "update-index", "--add", "--index-info"],
-            input=f"100644 {blob} 1\tREADME.md\n",
+            input=f"100644 {blob} 1\tunmerged-stage.txt\n",
             check=True,
             text=True,
         )
