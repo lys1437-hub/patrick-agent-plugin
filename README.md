@@ -113,12 +113,10 @@ claude plugin marketplace add anthropics/skills
 > 不能直接寫進本包的 `plugins` 清單。已於 2026-09-04 確認
 > `skills/skill-creator` 路徑存在。
 
-## ⚠️ 這個 repo 是產生出來的，不要直接編輯
+## 維護方式
 
-`skills/` 底下的內容是從作者的私有 repo **產生**出來的，
-複製時會做環境淨化（把指向作者本機的引用改寫成對方看得懂的說明）。
-
-**在這裡改會在下次 build 被覆蓋。** 有問題或想改內容，直接跟作者說。
+這個 repo 是可直接維護與發佈的公開 plugin payload。修改 `skills/`、文件或 manifest 時，
+請透過 PR，並通過 `scripts/validate_plugin.py`、合約測試與 plugin manifest 驗證。
 
 
 ---
