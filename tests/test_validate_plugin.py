@@ -98,6 +98,20 @@ class PluginValidationTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("forbidden payload directory", result.stderr)
 
+    def test_validator_rejects_tracked_python_bytecode(self) -> None:
+        root = self.make_plugin()
+        cache = root / "tests" / "__pycache__"
+        cache.mkdir()
+        bytecode = cache / "test_validate_plugin.cpython-313.pyc"
+        bytecode.write_bytes(b"bytecode")
+        subprocess.run(["git", "init", "-q", str(root)], check=True)
+        subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden payload directory", result.stderr)
+
     def test_in_process_validation_resolves_root_before_containment_checks(self) -> None:
         root = self.make_plugin()
         alias = root.parent / "plugin-alias"
