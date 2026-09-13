@@ -162,6 +162,28 @@ class PluginValidationTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("tools must be exactly", result.stderr)
 
+    def test_agent_contract_does_not_read_lists_from_another_field_as_tools(self) -> None:
+        root = self.make_plugin()
+        path = root / "agents" / "skill-auditor.md"
+        path.write_text(
+            "---\nname: skill-auditor\ndescription: test\ntools:\n  - Bash\nskills:\n  - Read\n  - Grep\n  - Glob\n---\n",
+            encoding="utf-8",
+        )
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("tools must be exactly", result.stderr)
+
+    def test_agent_contract_rejects_non_utf8_agent_file(self) -> None:
+        root = self.make_plugin()
+        (root / "agents" / "skill-auditor.md").write_bytes(b"\xff")
+
+        result = self.validate(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("readable UTF-8", result.stderr)
+
     def test_in_process_validation_resolves_root_before_containment_checks(self) -> None:
         root = self.make_plugin()
         alias = root.parent / "plugin-alias"

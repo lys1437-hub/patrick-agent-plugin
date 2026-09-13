@@ -157,7 +157,8 @@ def check_agent_contract(root: Path, problems: list[str]) -> None:
     path = root / "agents" / "skill-auditor.md"
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
-    except (OSError, UnicodeDecodeError):
+    except (OSError, UnicodeDecodeError) as error:
+        problems.append(f"skill-auditor agent must be readable UTF-8: {error}")
         return
     if not lines or lines[0] != "---":
         problems.append("skill-auditor agent must have YAML frontmatter")
@@ -168,17 +169,47 @@ def check_agent_contract(root: Path, problems: list[str]) -> None:
         problems.append("skill-auditor agent must close its YAML frontmatter")
         return
     metadata = lines[1:end]
-    if "name: skill-auditor" not in metadata:
+    scalar_fields: dict[str, str] = {}
+    tools: list[str] | None = None
+    index = 0
+    while index < len(metadata):
+        line = metadata[index]
+        if not line or line.isspace():
+            index += 1
+            continue
+        if line.startswith("name:") or line.startswith("description:"):
+            key, value = line.split(":", 1)
+            if key in scalar_fields or not value.strip():
+                problems.append(f"skill-auditor agent has an invalid {key} field")
+            else:
+                scalar_fields[key] = value.strip()
+            index += 1
+            continue
+        if line == "tools:":
+            if tools is not None:
+                problems.append("skill-auditor agent must declare tools exactly once")
+                index += 1
+                continue
+            tools = []
+            index += 1
+            while index < len(metadata) and metadata[index].startswith("  - "):
+                tool = metadata[index].removeprefix("  - ").strip()
+                if not tool:
+                    problems.append("skill-auditor agent tools entries must be non-empty")
+                else:
+                    tools.append(tool)
+                index += 1
+            continue
+        problems.append(f"skill-auditor agent has an unsupported frontmatter field: {line}")
+        index += 1
+    if scalar_fields.get("name") != "skill-auditor":
         problems.append("skill-auditor agent name must be 'skill-auditor'")
-    if not any(line.startswith("description:") and line.removeprefix("description:").strip() for line in metadata):
+    if not scalar_fields.get("description"):
         problems.append("skill-auditor agent must have a non-empty description")
-    try:
-        tools_start = metadata.index("tools:")
-    except ValueError:
+    if tools is None:
         problems.append("skill-auditor agent must declare read-only tools")
         return
-    tools = {line.strip().removeprefix("- ").strip() for line in metadata[tools_start + 1:] if line.startswith("  - ")}
-    if tools != {"Read", "Grep", "Glob"}:
+    if set(tools) != {"Read", "Grep", "Glob"} or len(tools) != 3:
         problems.append("skill-auditor agent tools must be exactly Read, Grep, and Glob")
 
 
