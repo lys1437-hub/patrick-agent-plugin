@@ -45,16 +45,15 @@ ALLOWED_MARKETPLACE_FIELDS = {"name", "description", "owner", "plugins"}
 ALLOWED_MARKETPLACE_ENTRY_FIELDS = {"name", "source", "description"}
 EXTERNAL_SOURCE_FIELDS = {"source", "repo", "sha"}
 REPOSITORY_COMPONENT = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
-
-
-def is_plain_yaml_scalar(value: str) -> bool:
-    """Accept the intentionally small, unambiguous scalar subset for this agent."""
-    return bool(
-        value
-        and value not in {"~", "null", "Null", "NULL", "true", "false", "yes", "no"}
-        and not value.startswith(("'", '"', "[", "{", "&", "*", "!", "|", ">"))
-        and ": " not in value
-    )
+EXPECTED_AGENT_FRONTMATTER = """---
+name: skill-auditor
+description: 掃使用者的 skill 目錄下所有 skill 的斷引用、硬編絕對路徑、description 截斷與 provenance 缺漏，回報結構化清單。**唯讀，不改檔。** 需要一次讀很多檔案時派給它，避免塞爆主對話。
+tools:
+  - Read
+  - Grep
+  - Glob
+---
+"""
 
 
 def load_json(root: Path, relative_path: str, problems: list[str]) -> dict | None:
@@ -166,62 +165,12 @@ def check_manifest_paths(root: Path, plugin: dict, marketplace: dict, problems: 
 def check_agent_contract(root: Path, problems: list[str]) -> None:
     path = root / "agents" / "skill-auditor.md"
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()
+        contents = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as error:
         problems.append(f"skill-auditor agent must be readable UTF-8: {error}")
         return
-    if not lines or lines[0] != "---":
-        problems.append("skill-auditor agent must have YAML frontmatter")
-        return
-    try:
-        end = lines.index("---", 1)
-    except ValueError:
-        problems.append("skill-auditor agent must close its YAML frontmatter")
-        return
-    metadata = lines[1:end]
-    scalar_fields: dict[str, str] = {}
-    tools: list[str] | None = None
-    index = 0
-    while index < len(metadata):
-        line = metadata[index]
-        if not line or line.isspace():
-            index += 1
-            continue
-        if line.startswith("name:") or line.startswith("description:"):
-            key, value = line.split(":", 1)
-            scalar = value.strip()
-            if key in scalar_fields or not is_plain_yaml_scalar(scalar):
-                problems.append(f"skill-auditor agent has an invalid {key} field")
-            else:
-                scalar_fields[key] = scalar
-            index += 1
-            continue
-        if line == "tools:":
-            if tools is not None:
-                problems.append("skill-auditor agent must declare tools exactly once")
-                index += 1
-                continue
-            tools = []
-            index += 1
-            while index < len(metadata) and metadata[index].startswith("  - "):
-                tool = metadata[index].removeprefix("  - ").strip()
-                if not tool:
-                    problems.append("skill-auditor agent tools entries must be non-empty")
-                else:
-                    tools.append(tool)
-                index += 1
-            continue
-        problems.append(f"skill-auditor agent has an unsupported frontmatter field: {line}")
-        index += 1
-    if scalar_fields.get("name") != "skill-auditor":
-        problems.append("skill-auditor agent name must be 'skill-auditor'")
-    if not scalar_fields.get("description"):
-        problems.append("skill-auditor agent must have a non-empty description")
-    if tools is None:
-        problems.append("skill-auditor agent must declare read-only tools")
-        return
-    if set(tools) != {"Read", "Grep", "Glob"} or len(tools) != 3:
-        problems.append("skill-auditor agent tools must be exactly Read, Grep, and Glob")
+    if not contents.startswith(EXPECTED_AGENT_FRONTMATTER):
+        problems.append("skill-auditor agent frontmatter must match the shipped read-only contract")
 
 
 def is_allowed(relative: Path) -> bool:

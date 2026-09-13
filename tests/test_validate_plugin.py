@@ -160,7 +160,7 @@ class PluginValidationTests(unittest.TestCase):
         result = self.validate(root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("tools must be exactly", result.stderr)
+        self.assertIn("frontmatter must match", result.stderr)
 
     def test_agent_contract_does_not_read_lists_from_another_field_as_tools(self) -> None:
         root = self.make_plugin()
@@ -173,7 +173,7 @@ class PluginValidationTests(unittest.TestCase):
         result = self.validate(root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("tools must be exactly", result.stderr)
+        self.assertIn("frontmatter must match", result.stderr)
 
     def test_agent_contract_rejects_non_utf8_agent_file(self) -> None:
         root = self.make_plugin()
@@ -198,7 +198,23 @@ class PluginValidationTests(unittest.TestCase):
                 result = self.validate(root)
 
                 self.assertNotEqual(result.returncode, 0)
-                self.assertIn("invalid description", result.stderr)
+                self.assertIn("frontmatter must match", result.stderr)
+
+    def test_agent_contract_rejects_comment_number_and_missing_mapping_separator(self) -> None:
+        for description in ("# comment only", "123", "test"):
+            with self.subTest(description=description):
+                root = self.make_plugin()
+                path = root / "agents" / "skill-auditor.md"
+                contents = path.read_text(encoding="utf-8").replace(
+                    "description: 掃使用者的 skill 目錄下所有 skill 的斷引用、硬編絕對路徑、description 截斷與 provenance 缺漏，回報結構化清單。**唯讀，不改檔。** 需要一次讀很多檔案時派給它，避免塞爆主對話。",
+                    f"description:{description}" if description == "test" else f"description: {description}",
+                )
+                path.write_text(contents, encoding="utf-8")
+
+                result = self.validate(root)
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("frontmatter must match", result.stderr)
 
     def test_in_process_validation_resolves_root_before_containment_checks(self) -> None:
         root = self.make_plugin()
