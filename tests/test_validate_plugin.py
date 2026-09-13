@@ -340,7 +340,7 @@ class PluginValidationTests(unittest.TestCase):
     def test_validator_rejects_extra_cli_arguments(self) -> None:
         root = self.make_plugin()
         result = subprocess.run(
-            ["python3", str(VALIDATOR), str(root), "--strict"],
+            [sys.executable, str(VALIDATOR), str(root), "--strict"],
             check=False, capture_output=True, text=True,
         )
         self.assertNotEqual(result.returncode, 0)
