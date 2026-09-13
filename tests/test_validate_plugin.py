@@ -184,6 +184,22 @@ class PluginValidationTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("readable UTF-8", result.stderr)
 
+    def test_agent_contract_rejects_ambiguous_or_non_string_descriptions(self) -> None:
+        for description in ("[", '\"\"', "null", "test: broken"):
+            with self.subTest(description=description):
+                root = self.make_plugin()
+                path = root / "agents" / "skill-auditor.md"
+                contents = path.read_text(encoding="utf-8").replace(
+                    "description: 掃使用者的 skill 目錄下所有 skill 的斷引用、硬編絕對路徑、description 截斷與 provenance 缺漏，回報結構化清單。**唯讀，不改檔。** 需要一次讀很多檔案時派給它，避免塞爆主對話。",
+                    f"description: {description}",
+                )
+                path.write_text(contents, encoding="utf-8")
+
+                result = self.validate(root)
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("invalid description", result.stderr)
+
     def test_in_process_validation_resolves_root_before_containment_checks(self) -> None:
         root = self.make_plugin()
         alias = root.parent / "plugin-alias"

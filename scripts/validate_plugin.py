@@ -47,6 +47,16 @@ EXTERNAL_SOURCE_FIELDS = {"source", "repo", "sha"}
 REPOSITORY_COMPONENT = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
 
 
+def is_plain_yaml_scalar(value: str) -> bool:
+    """Accept the intentionally small, unambiguous scalar subset for this agent."""
+    return bool(
+        value
+        and value not in {"~", "null", "Null", "NULL", "true", "false", "yes", "no"}
+        and not value.startswith(("'", '"', "[", "{", "&", "*", "!", "|", ">"))
+        and ": " not in value
+    )
+
+
 def load_json(root: Path, relative_path: str, problems: list[str]) -> dict | None:
     path = root / relative_path
     try:
@@ -179,10 +189,11 @@ def check_agent_contract(root: Path, problems: list[str]) -> None:
             continue
         if line.startswith("name:") or line.startswith("description:"):
             key, value = line.split(":", 1)
-            if key in scalar_fields or not value.strip():
+            scalar = value.strip()
+            if key in scalar_fields or not is_plain_yaml_scalar(scalar):
                 problems.append(f"skill-auditor agent has an invalid {key} field")
             else:
-                scalar_fields[key] = value.strip()
+                scalar_fields[key] = scalar
             index += 1
             continue
         if line == "tools:":
