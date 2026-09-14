@@ -36,7 +36,7 @@ description: 掃你的 skill 目錄健康度：斷引用、硬編絕對路徑、
 
 在主對話直接跑，**唯讀**：只用 Read／Grep／Glob，不要動任何檔案。
 
-⚠️ **本包沒有可在所有 runtime 強制驗證的工具層保護，只有上面那條紀律。**（`plugin.json` 的 `agents` 欄位宣告了唯讀 `skill-auditor` subagent（隨附於 `agents/skill-auditor.md`）；**這只是宣告，不是保證**——實際會不會被載入、載入後的工具限制是否生效，由你使用的 Claude Code 版本或其他 runtime 決定，作者尚未在非本機環境驗證過。）這一點務必當真：授權必須發生在清單出現之後。
+⚠️ **本包沒有工具層的保護，只有上面那條紀律。**（`plugin.json` 的 `agents` 欄位宣告了唯讀 `skill-auditor` subagent（隨附於 `agents/skill-auditor.md`）；**這只是宣告，不是保證**——實際會不會被載入、載入後的工具限制是否生效，由你使用的 Claude Code 版本或其他 runtime 決定，作者尚未在非本機環境驗證過。）這一點務必當真：授權必須發生在清單出現之後。
 
 ## 四項檢查
 

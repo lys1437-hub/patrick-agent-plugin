@@ -61,7 +61,7 @@ claude plugin list
 | `skill-doctor` | 唯讀掃描 Skill 的斷引用、路徑耦合、description 截斷與 provenance |
 | `one-page-report` | 產出單檔、自包含、可列印的一頁報告，並附交付前檢查器 |
 
-另附唯讀的 `skill-auditor` agent；payload 以 Apache-2.0 授權，詳見 [LICENSE](LICENSE)。每次 PR 都會在 Linux、macOS 與 Windows 執行 payload 驗證與 contract tests。
+另附宣告為唯讀的 `skill-auditor` agent（`agents/skill-auditor.md` 宣告 `tools: Read/Grep/Glob`；實際會不會被載入、工具限制是否生效，由你的 runtime 決定，作者尚未在非本機環境驗證過）；payload 以 Apache-2.0 授權，詳見 [LICENSE](LICENSE)。每次 PR 都會在 Linux、macOS 與 Windows 執行 payload 驗證與 contract tests。
 
 ## 上游 plugin：只給地址，不複製
 
@@ -104,6 +104,11 @@ claude plugin marketplace add anthropics/skills
 
 這個 repo 是可直接維護與發佈的公開 plugin payload。修改 `skills/`、文件或 manifest 時，
 請透過 PR，並通過 `scripts/validate_plugin.py`、合約測試與 plugin manifest 驗證。
+
+**版本政策：** 只要這次 PR 改了讀者會依賴的出貨內容（`skills/`、`agents/`、`TEAM_RULES.md`、
+`WHY-THESE-RULES.md`、`ACCEPTANCE-LEVELS.md` 等文字或行為），就要把 `.claude-plugin/plugin.json`
+的 `version` 往上跳（至少 patch）。**不允許內容變了、版本號沒變**——那會讓兩個內容不同的版本
+對外看起來一樣，沒有人能靠版本號分辨自己裝到哪一份。純排版／錯字修正不在此限，由 PR 作者判斷。
 
 
 ---
