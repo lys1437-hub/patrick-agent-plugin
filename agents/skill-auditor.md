@@ -49,7 +49,7 @@ tools:
 **以下情況不算斷引用，不要報：**
 - 該檔案是**這支 skill 自己會產生**的產出物（`INDEX.md`、`_skeleton.md`、`_sources.md` 這類）
 - 檔名出現在 **changelog 或說明文字**裡講外部產品，不是引用
-- 指向家目錄的 L1 檔案（`CLAUDE.md`、`AGENTS.md`）
+- 指向家目錄的核心規則檔（`CLAUDE.md`、`AGENTS.md`）
 
 ### 2. 硬編絕對路徑
 
