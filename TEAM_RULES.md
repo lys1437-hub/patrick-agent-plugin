@@ -23,7 +23,7 @@
 | 判斷「裝了到底能不能用」 | `ACCEPTANCE-LEVELS.md`（三層驗收，**新人請先讀這份**） |
 | 規則檔 | 你們的 `CLAUDE.md` 或 `AGENTS.md`，放在專案根目錄 |
 | 憑證檔 | **repo 外**，例如 `~/.config/⟨專案⟩/`，`chmod 600` |
-| 垃圾桶刪除 | macOS `trash`（`brew install trash`）／Linux `gio trash` |
+| 垃圾桶刪除 | macOS `trash`（`brew install trash`）／Linux `gio trash`；Windows 一律不透過 CLI 刪除（即使裝了等價工具如 npm `trash-cli`），列出完整路徑，交由使用者在檔案總管按 Delete —— 與下方「破壞性操作」的 Windows 規則一致，不是條件式 |
 | 分支命名 | `⟨誰⟩/⟨任務⟩`，一個 agent 一個任務一條 |
 | 「一輪」怎麼算 | **一次「你提出 → 我回覆」算一輪**，不是一次 commit |
 | 交叉覆核怎麼開 | **另開一個對話或 session**，只給輸入與問題，**不要貼原本的推理過程** |
