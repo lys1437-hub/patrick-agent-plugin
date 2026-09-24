@@ -7,7 +7,7 @@ metadata:
   provenance:
     type: derived-guidance
     sources:
-      - OpenAI skill-creator (Apache-2.0)
+      - Anthropic skill-creator (Apache-2.0)
 ---
 
 # Skill 工作流建造器
