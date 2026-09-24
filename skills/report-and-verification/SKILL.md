@@ -7,7 +7,7 @@ metadata:
   provenance:
     type: clean-room-original
     sources:
-      - name: OpenAI skill-creator
+      - name: Anthropic skill-creator
         license: Apache-2.0
         used_for: Skill 結構、範圍控制與漸進揭露
       - name: obra/superpowers verification-before-completion
