@@ -1,7 +1,7 @@
 skill-workflow-builder 0.1.0
 Copyright 2026
 
-This work adapts workflow design principles from OpenAI's skill-creator,
+This work adapts workflow design principles from Anthropic's skill-creator,
 licensed under the Apache License, Version 2.0. The skill contents were
 newly authored for this package; no course or private-source material was used.
 
