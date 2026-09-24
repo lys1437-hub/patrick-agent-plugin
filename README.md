@@ -65,6 +65,18 @@ claude plugin list
 
 另附宣告為唯讀的 `skill-auditor` agent（`agents/skill-auditor.md` 宣告 `tools: Read/Grep/Glob`；實際會不會被載入、工具限制是否生效，由你的 runtime 決定，作者尚未在非本機環境驗證過）；payload 以 Apache-2.0 授權，詳見 [LICENSE](LICENSE)。每次 PR 都會在 Linux、macOS 與 Windows 執行 payload 驗證與 contract tests。
 
+## 第三方來源聲明（NOTICE）
+
+其中兩支 skill 參考了別人公開的作品，各自附有 `NOTICE`（來源與原授權）和 `LICENSE`：
+
+- [`skills/report-and-verification/NOTICE`](skills/report-and-verification/NOTICE)：
+  參考 Anthropic `skill-creator` 的指引（Apache-2.0），以及 `obra/superpowers` 的
+  `verification-before-completion` 原則（MIT）。
+- [`skills/skill-workflow-builder/NOTICE`](skills/skill-workflow-builder/NOTICE)：
+  改編 Anthropic `skill-creator` 的工作流設計原則（Apache-2.0）。
+
+轉散布或改作這兩支 skill 時，請一併保留它們的 `NOTICE` 與 `LICENSE`。
+
 ## 上游 plugin：只給地址，不複製
 
 `marketplace.json` 除了本包，還列了指向**別人作品**的 plugin。
