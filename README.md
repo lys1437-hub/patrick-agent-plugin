@@ -2,6 +2,24 @@
 
 LipiD 的產品工作方法 skill 包，給 Claude Code 用。
 
+## English summary
+
+A Claude Code plugin packaging LipiD's product-work methods as skills; the skill content is written in Traditional Chinese.
+
+Skills:
+
+- `feature-proposal-planning`
+- `one-page-report`
+- `report-and-verification`
+- `skill-doctor`
+- `skill-workflow-builder`
+- `team-delivery-review`
+- `team-weekly-review`
+
+Installation: see [安裝](#安裝).
+
+License: Apache-2.0 ([LICENSE](LICENSE)). Third-party notices: see [第三方來源聲明（NOTICE）](#第三方來源聲明notice).
+
 ## 安裝
 
 ### 0. 前置條件
