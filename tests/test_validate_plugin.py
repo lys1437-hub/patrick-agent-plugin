@@ -389,7 +389,7 @@ class PluginValidationTests(unittest.TestCase):
     def test_payload_over_total_limit_fails(self) -> None:
         root = self.make_plugin()
         oversized = root / "portfolio" / "example.md"
-        oversized.parent.mkdir(parents=True)
+        oversized.parent.mkdir(parents=True, exist_ok=True)
         oversized.write_bytes(b"x" * (512 * 1024))
 
         result = self.validate(root)
@@ -400,7 +400,7 @@ class PluginValidationTests(unittest.TestCase):
     def test_payload_over_single_file_limit_fails(self) -> None:
         root = self.make_plugin()
         oversized = root / "portfolio" / "example.md"
-        oversized.parent.mkdir(parents=True)
+        oversized.parent.mkdir(parents=True, exist_ok=True)
         oversized.write_bytes(b"x" * (64 * 1024 + 1))
 
         result = self.validate(root)
@@ -468,7 +468,7 @@ class PluginValidationTests(unittest.TestCase):
         target = root.parent / "external-payload"
         target.mkdir()
         (target / "vectors.faiss").write_bytes(b"outside payload")
-        (root / "portfolio").mkdir()
+        (root / "portfolio").mkdir(exist_ok=True)
         try:
             (root / "portfolio" / "linked").symlink_to(target, target_is_directory=True)
         except OSError as error:
