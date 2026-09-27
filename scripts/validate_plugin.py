@@ -45,6 +45,7 @@ README.md
 TEAM_RULES.md
 WHY-THESE-RULES.md
 agents/skill-auditor.md
+portfolio/workflow/README.md
 scripts/validate_plugin.py
 skills/feature-proposal-planning/SKILL.md
 skills/feature-proposal-planning/evals/unsourced-metric/graders/must-ask-for-caliber.md
