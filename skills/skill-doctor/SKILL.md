@@ -1,7 +1,7 @@
 ---
 name: skill-doctor
 provenance: 自建（2026-08-26）
-user-invocable: true   # 2026-08-26 加。⚠️ 當時理由是「沒這欄叫不動」，實測證偽（14 支全都叫得動）。留著只為與另外 4 支一致，此欄實際用途未知。
+user-invocable: true
 description: 掃你的 skill 目錄健康度：斷引用、硬編絕對路徑、description 被 Codex 截斷、provenance 缺漏。**只回報不改檔**。觸發：「skill 健檢」「skill 有沒有問題」「check skills」。
 ---
 
@@ -47,9 +47,9 @@ description: 掃你的 skill 目錄健康度：斷引用、硬編絕對路徑、
 | 3 | **description 截斷** | 觸發詞與排除條件有沒有落在**前 123 字元**內 |
 | 4 | **provenance** | frontmatter 有沒有標來歷（決定能不能散布） |
 
-## 🔴 最容易做錯的一件事（2026-08-26 實際踩過三次）
+## 命中不等於問題
 
-**命中不等於問題。** 同一天我跑這個掃描三次，報了 **70 筆 → 17 筆 → 0 筆**，前兩次全是假警報：
+常見假警報：
 
 | 假警報 | 真相 |
 |---|---|
