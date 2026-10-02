@@ -44,6 +44,8 @@ metadata:
 
 交付牽涉多份互相關聯的規格、計畫、決策、驗證紀錄或產物時，必須先讀 [references/artifact-consistency.md](references/artifact-consistency.md)，完成跨 artifact 一致性檢查後才可選 `verified`。
 
+轉錄或撰寫工具能力描述（某個可執行工具接受哪些參數、會寫入什麼、有沒有某項功能）時，不論是否涉及多份 artifact，都先讀 [references/artifact-consistency.md](references/artifact-consistency.md) 的〈工具能力描述的查證〉。
+
 ## 回報格式
 
 ```text
