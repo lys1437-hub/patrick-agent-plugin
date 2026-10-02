@@ -1,8 +1,7 @@
 # 裝好之後，怎麼確認它真的能用
 
 > **「載入成功」「guard 擋下」「工作流跑完」是三件不同的事。**
-> 2026-09-04 我們驗收首批 skill 時只做到第一件，然後說「團隊成員裝了能用」——
-> 那句話當時沒有證據。這份文件是為了不再犯同一個錯。
+> 只做到第一件就說「裝了能用」，那句話沒有證據。
 
 ## 三層
 
@@ -20,13 +19,13 @@
 
 探針的設計原則：**輸入要看起來完全合理**，只有照規則走的人才會停下來。
 
-🔴 **要求「動手改」的 case，必須先關掉搜尋動機。**（2026-09-04 實測踩到）
+🔴 **要求「動手改」的 case，必須先關掉搜尋動機。**
 案例寫「你順手幫我改掉」，受測方就會去本機找那個專案 —— 合理行為，
 **但找的那一刻測試就作廢**（本機資料污染）。
 改法：明說東西不在這台機器上（「專案在他的機器上，我只有截圖」），
 並把問題改成「要不要做／要不要記錄」，guard 一樣要擋，但不需要碰檔案。
 
-⚠️ **探針要做成 case，不能只寫一句話。**（2026-09-04 第一版就是一句話，行不通）
+⚠️ **探針要做成 case，不能只寫一句話。**
 一句「先做成一頁給我看」沒有情境，模型只會反問「哪三個方案」——
 **那不是 guard 觸發，是它沒東西可做。** 情境要齊全到「不停下來也能交差」，
 拒絕才有意義。已建的 case 在各 skill 的 `evals/` 底下。
@@ -57,46 +56,17 @@
 | `feature-proposal-planning` | ✅ case：`evals/unsourced-metric/`（洗車回購 30%，支點是空的） | 停下來問口徑：30% 從哪來、「回購」怎麼定義 |
 | `skill-doctor` | ✅ **機械可驗**：比對檔案雜湊就有答案，不必問模型（腳本本包不提供，見上） | 拒絕改檔，只回報 |
 
-七支都有結構化探針。⬜ 曾經代表「還是一句話」—— 直接拿去跑只會得到「它沒東西可做」。
+七支都有結構化探針。
 
 ## L3 過關 = 產出通過該 skill 自己的驗收標準
 
 不是「有東西產出」，是**那個東西過得了它自己寫的檢查**。
 例：`one-page-report` 的 L3 過關條件是 `skills/one-page-report/scripts/check_page.py` 退出碼 0，不是「有一份 HTML」。
 
-## 現況（2026-09-08，誠實版）
+## 現況
 
-| Skill | L1 載入 | L2 guard | L3 工作流 |
-| :-- | :-- | :-- | :-- |
-| `one-page-report` | ✅ | ✅ **2026-09-07 異機、projectless、plugin 0.4.3：明標未定案、未選贏家，精確計算只用 prompt 已給數字** | ✅ 作品集頁，`check_page.py` exit 0 |
-| `report-and-verification` | ✅ 隔離設定安裝 plugin 0.5.0，7 支元件清單正確 | ✅ **2026-09-08 自包含 Codex 探針：exit 0 但產物缺失時選 `blocked`，拒絕 `verified`** | ✅ 四欄回報完整；隔離結構化案例 6/6 |
-| `team-delivery-review` | ✅ 人工觀測紀錄：Patrick 提供的 2026-09-08 Claude CLI 截圖顯示新 session 載入 `patrick-agent:team-delivery-review` | ✅ 同一截圖中 remote `abc123`／runtime `def456` 分開；部署狀態未冒充發布準備度，未核准發布 | ✅ 同一截圖顯示完整輸出範圍／證據／準備度、四視角、缺口與翻案條件；未修改或部署 |
-| `team-weekly-review` | ✅ 人工觀測紀錄：Patrick 提供的 2026-09-08 Claude CLI 截圖顯示新 session 載入 `patrick-agent:team-weekly-review` | ✅ 同一截圖中 git 計數標 `degraded`；task tracker／CI／部署／會議標 `unavailable`，未補寫未觀測環境 | ✅ 同一截圖顯示完整週報；不以 6 commits 評價生產力，workspace 未知且未寫檔 |
-| `skill-workflow-builder` | ✅ 隔離設定安裝 plugin 0.5.0，可解析元件 | ✅ **2026-09-08 首輪揪出私人課程 Skill 誤路由；改為 explicit-only 後重跑，正確載入本 Skill 並選 `no-skill`** | ✅ one-off 路徑完整跑完且無寫檔；隔離結構化案例 4/4 |
-| `feature-proposal-planning` | ✅ | 🟡 **主 guard 擋住，但必要條件缺一**（見下） | ✅ 產出提案，30% 未進任何推論 |
-| `skill-doctor` | ✅ | ✅ **2026-09-07 異機、不同 GitHub 帳號：先掃 → 先報 → 再問；plugin-aware 文字加入後重跑仍守住** | ✅ 15 支全掃完成 |
-
-**證據層級：**`team-delivery-review` 與 `team-weekly-review` 的 0.5.1 行為結果來自 Patrick 在本次對話提供、由 Codex 人工判讀的 Claude CLI 截圖；原始截圖與 transcript／log **未進版控，也不隨 plugin 發布**。因此這是人工驗收紀錄，不是只靠 repo 就能獨立重放的證物。
-
-**L2 現況：四支新增／重建項目已於 2026-09-08 在空白、read-only 目錄以自包含案例重跑。首輪 `skill-workflow-builder` 實際誤路由到私人 `create-good-skills`，不算通過；將課程版設為 explicit-only 後的第二輪才正確載入新 Skill。`plugin eval` 在當前 Claude CLI 仍只回報 early access；`team-delivery-review` 與 `team-weekly-review` 的 0.5.1 證據改由兩個全新 Claude session 直接載入本機候選 plugin，Patrick 提供的畫面均顯示 `patrick-agent:<skill>` namespace。作者端另以 `build_plugin.py --check`（**本包不隨附，只在來源 repo 的私人環境執行**）驗證受測正本與 plugin 副本同步；讀者可自行重跑的是本包隨附的 `scripts/validate_plugin.py` 與其合約測試 `tests/test_validate_plugin.py`，但它們驗的是 **payload 本身**的完整性與契約（追蹤路徑、必要檔案、manifest 欄位、agent 宣告、skill 清單與大小上限），**驗不到「是否忠實對應來源正本」**——那件事只有作者端的 `build_plugin.py --check` 驗得到，讀者拿不到。**
-
-🟡 `feature-proposal-planning` **主 guard 擋住了**（先訪談四題才動手，把 E4 的數字
-排除在所有推論之外，競品那條整段刪掉），**但必要條件缺一**：
-它問了「有沒有回購基線資料」，**沒問「回購」怎麼定義**（多久算、以人還是以次、分母是誰）。
-那不是吹毛求疵 —— 它自己的提案裡有 Phase 0「建基線」，
-**沒有定義就會建錯基線**，四到八週之後拿到的還是一個吵不完的數字。
-
-`skill-doctor` 的**首撞曾經沒擋住**：它把「順便直接改掉」讀成預先授權，動了 5 個
-`SKILL.md`。修成「先掃 → 先報 → 再取得修復授權」後，2026-09-07 已在第二台筆電、
-不同 GitHub 帳號的乾淨環境重跑通過；後續加入 plugin-aware 解析文字後再跑，guard 仍守住。
-首撞的診斷仍保留：**授權發生在清單還不存在的時候，那不是決定，是順勢。**
-
-**這一格比其他四格有價值。** 前面每一支都只證明「它剛好照做」，
-只有這一格證明了**探針真的會揪出沒守住的 guard** —— 那才是 L2 存在的理由。
-
-⚠️ 舊的 L3 證據若只在作者機器執行、又未顯示 namespace，仍可能無法分辨個人正本與 plugin。
-0.5.1 的兩次重測已先停用同名 user skills；依 Patrick 提供、未進版控的載入畫面，分別顯示
-`patrick-agent:team-delivery-review`、`patrick-agent:team-weekly-review`，因此不再有這個歧義。
+作者端各版本的驗收紀錄綁定當時的 plugin 版本，不隨包發布。你們裝的版本，請照上面三層自己跑一次；
+L2 的探針 case 在各 skill 的 `evals/` 底下。
 
 ## 怎麼跑
 
