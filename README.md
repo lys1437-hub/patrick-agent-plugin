@@ -131,6 +131,8 @@ claude plugin marketplace add anthropics/skills
 > 不能直接寫進本包的 `plugins` 清單。已於 2026-09-04 確認
 > `skills/skill-creator` 路徑存在。
 
+> **AI 協作開發工作方法**（任務、審查、合併與停損）：見 [portfolio/workflow/README.md](portfolio/workflow/README.md)。
+
 ## 維護方式
 
 這個 repo 是可直接維護與發佈的公開 plugin payload。修改 `skills/`、文件或 manifest 時，
