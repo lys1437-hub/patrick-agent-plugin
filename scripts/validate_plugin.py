@@ -67,6 +67,7 @@ skills/report-and-verification/evals/cases.json
 skills/report-and-verification/evals/grader.md
 skills/report-and-verification/references/artifact-consistency.md
 skills/report-and-verification/references/decision-grade-verification.md
+skills/report-and-verification/references/published-copy-verification.md
 skills/skill-doctor/SKILL.md
 skills/skill-workflow-builder/LICENSE
 skills/skill-workflow-builder/NOTICE

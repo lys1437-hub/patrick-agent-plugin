@@ -46,6 +46,10 @@ metadata:
 
 轉錄或撰寫工具能力描述（某個可執行工具接受哪些參數、會寫入什麼、有沒有某項功能）時，不論是否涉及多份 artifact，都先讀 [references/artifact-consistency.md](references/artifact-consistency.md) 的〈工具能力描述的查證〉。
 
+把本機文件發布或更新到已被引用的副本（例如協作文件頁面）時，必須先讀 [references/published-copy-verification.md](references/published-copy-verification.md)，三項驗收全部通過才可選 `verified`。
+
+可回復性屬「輕」級的交付（產出是文件，或寫進有版本紀錄、可再編輯的系統，改錯了可以直接改回），驗證以一個機械核對的實跑結果為足，例如上述發布副本驗收或建立後讀回欄位。這只減少要跑的檢查數，不放寬本節判定線：該核對必須能直接判斷這次的完成主張；主張超出它的範圍時，超出部分列入未驗範圍，不得選 `verified`。資料數字與多份 artifact 的規定照舊適用。
+
 ## 回報格式
 
 ```text
