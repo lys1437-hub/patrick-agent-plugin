@@ -38,6 +38,8 @@ description: 掃你的 skill 目錄健康度：斷引用、硬編絕對路徑、
 
 ⚠️ **本包沒有工具層的保護，只有上面那條紀律。**（`plugin.json` 的 `agents` 欄位宣告了唯讀 `skill-auditor` subagent（隨附於 `agents/skill-auditor.md`）；**這只是宣告，不是保證**——實際會不會被載入、載入後的工具限制是否生效，由你使用的 Claude Code 版本或其他 runtime 決定，作者尚未在非本機環境驗證過。）這一點務必當真：授權必須發生在清單出現之後。
 
+掃描範圍不含掃描根目錄下的 `synced/`（組織同步進來的 skill）：列清單用 Glob `*/SKILL.md`，不要用 `**/SKILL.md`，結果裡掃描根目錄下一層就是 `synced/` 的項目一律丟棄。
+
 ## 四項檢查
 
 | # | 檢查 | 判準 |
