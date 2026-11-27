@@ -9,12 +9,14 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.validate_plugin import validate as validate_in_process
+from scripts import validate_plugin as validator_module
 
 VALIDATOR = REPO_ROOT / "scripts" / "validate_plugin.py"
 
@@ -692,6 +694,207 @@ class PluginValidationTests(unittest.TestCase):
         result = self.validate(root)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Skill set mismatch", result.stderr)
+
+
+    def add_release_files(self, root: Path, files: dict[str, str]) -> None:
+        for relative, contents in files.items():
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(contents, encoding="utf-8")
+
+    def validate_with_inventory(self, root: Path, extra: set[str]) -> list[str]:
+        with mock.patch.object(validator_module, "EXPECTED_TRACKED_PATHS", validator_module.EXPECTED_TRACKED_PATHS | extra):
+            return validate_in_process(root)
+
+    def tool_files(self) -> dict[str, str]:
+        return {
+            "tools/example.py": "# SPDX-License-Identifier: Apache-2.0\nraise RuntimeError('must never execute')\n",
+            "tools/tests/test_example.py": "raise RuntimeError('must never import')\n",
+        }
+
+    def hook_files(self, command: str = '"${CLAUDE_PLUGIN_ROOT}/hooks/example.sh"', **fields: object) -> dict[str, str]:
+        handler = {"type": "command", "command": command, **fields}
+        return {
+            "hooks/hooks.json": json.dumps({"hooks": {"SessionStart": [{"matcher": "startup", "hooks": [handler]}]}}),
+            "hooks/example.sh": "#!/bin/sh\nexit 0\n",
+        }
+
+    def test_synthetic_tool_and_default_hooks_pass_without_execution(self) -> None:
+        root = self.make_plugin()
+        files = {**self.tool_files(), **self.hook_files()}
+        self.add_release_files(root, files)
+        self.assertEqual(self.validate_with_inventory(root, set(files)), [])
+
+    def test_tool_requires_matching_test(self) -> None:
+        root = self.make_plugin()
+        files = self.tool_files()
+        files.pop("tools/tests/test_example.py")
+        self.add_release_files(root, files)
+        self.assertIn("tool requires matching test: tools/example.py", self.validate_with_inventory(root, set(files)))
+
+    def test_tool_test_requires_matching_tool(self) -> None:
+        root = self.make_plugin()
+        files = self.tool_files()
+        files.pop("tools/example.py")
+        self.add_release_files(root, files)
+        self.assertIn("tool test requires matching tool: tools/tests/test_example.py", self.validate_with_inventory(root, set(files)))
+
+    def test_tool_requires_exact_license_in_first_five_lines(self) -> None:
+        for contents in ("pass\n", "# SPDX-License-Identifier: MIT\n", "\n" * 5 + "# SPDX-License-Identifier: Apache-2.0\n", " # SPDX-License-Identifier: Apache-2.0\n"):
+            with self.subTest(contents=contents):
+                root = self.make_plugin()
+                files = self.tool_files()
+                files["tools/example.py"] = contents
+                self.add_release_files(root, files)
+                self.assertIn("tool requires Apache-2.0 SPDX line in first five lines: tools/example.py", self.validate_with_inventory(root, set(files)))
+
+    def test_tool_license_on_fifth_line_passes(self) -> None:
+        root = self.make_plugin()
+        files = self.tool_files()
+        files["tools/example.py"] = "\n" * 4 + "# SPDX-License-Identifier: Apache-2.0\n"
+        self.add_release_files(root, files)
+        self.assertEqual(self.validate_with_inventory(root, set(files)), [])
+
+    def test_new_paths_keep_exact_release_inventory(self) -> None:
+        root = self.make_plugin()
+        files = {**self.tool_files(), **self.hook_files()}
+        self.add_release_files(root, files)
+        problems = validate_in_process(root)
+        for relative in files:
+            self.assertIn(f"unexpected release path: {relative}", problems)
+
+    def test_new_path_allowlist_is_shallow_and_suffix_specific(self) -> None:
+        for relative in ("tools/example.py", "tools/tests/test_example.py", "hooks/example.py", "hooks/example.sh", "hooks/hooks.json"):
+            with self.subTest(allowed=relative):
+                self.assertTrue(validator_module.is_allowed(Path(relative)))
+        for relative in ("tools/example.sh", "tools/example.json", "tools/nested/example.py", "tools/tests/example.py", "tools/tests/deep/test_example.py", "tools/__init__.py", "tools/tests/test___init__.py", "hooks/nested/example.sh", "hooks/example.txt", "hooks/example.bin", "portfolio/example.sh", "unknown/example.py"):
+            with self.subTest(rejected=relative):
+                self.assertFalse(validator_module.is_allowed(Path(relative)))
+
+    def test_new_paths_reject_disallowed_file_types_in_payload(self) -> None:
+        for relative in ("tools/example.sh", "hooks/example.txt", "hooks/example.bin"):
+            with self.subTest(relative=relative):
+                root = self.make_plugin()
+                self.add_release_files(root, {relative: "synthetic fixture\n"})
+                problems = self.validate_with_inventory(root, {relative})
+                expected = "forbidden payload file type" if relative.endswith(".bin") else "unknown payload path or file type"
+                self.assertIn(f"{expected}: {relative}", problems)
+
+    def test_manifest_hooks_field_always_uses_default_only_error(self) -> None:
+        for value in ("./hooks/hooks.json", "./other.json", ["./hooks/hooks.json"], {"SessionStart": []}, None):
+            with self.subTest(value=value):
+                root = self.make_plugin()
+                path = root / ".claude-plugin/plugin.json"
+                plugin = json.loads(path.read_text(encoding="utf-8"))
+                plugin["hooks"] = value
+                path.write_text(json.dumps(plugin), encoding="utf-8")
+                result = self.validate(root)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("plugin.json must not declare hooks; this plugin only allows the default hooks/hooks.json", result.stderr)
+
+    def test_default_hooks_reject_invalid_json_and_utf8(self) -> None:
+        for contents in (b"{", b"\xff"):
+            with self.subTest(contents=contents):
+                root = self.make_plugin()
+                self.add_release_files(root, {"hooks/hooks.json": "{}"})
+                (root / "hooks/hooks.json").write_bytes(contents)
+                problems = self.validate_with_inventory(root, {"hooks/hooks.json"})
+                self.assertTrue(any("hooks/hooks.json must be valid JSON" in problem for problem in problems), problems)
+
+    def test_default_hooks_reject_unsupported_structures(self) -> None:
+        values = ([], {}, {"SessionStart": []}, {"hooks": []}, {"hooks": {}, "modules": []}, {"hooks": {"SessionStart": {}}}, {"hooks": {"SessionStart": ["other.json"]}}, {"hooks": {"SessionStart": [{"hooks": {}}]}}, {"hooks": {"SessionStart": [{"hooks": [{"type": "http", "url": "https://example.invalid"}]}]}}, {"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "echo", "args": "wrong"}]}]}})
+        for value in values:
+            with self.subTest(value=value):
+                root = self.make_plugin()
+                self.add_release_files(root, {"hooks/hooks.json": json.dumps(value)})
+                problems = self.validate_with_inventory(root, {"hooks/hooks.json"})
+                self.assertTrue(any("hooks/hooks.json" in problem for problem in problems), problems)
+
+    def test_hook_paths_accept_both_shell_quotes_and_exec_args(self) -> None:
+        handlers = (
+            {'command': '"${CLAUDE_PLUGIN_ROOT}"/hooks/example.sh'},
+            {'command': '"${CLAUDE_PLUGIN_ROOT}/hooks/example.sh"'},
+            {'command': 'sh', 'args': ['${CLAUDE_PLUGIN_ROOT}/hooks/example.sh']},
+            {'command': '${CLAUDE_PLUGIN_ROOT}/hooks/example.sh', 'args': []},
+        )
+        for fields in handlers:
+            with self.subTest(fields=fields):
+                root = self.make_plugin()
+                files = self.hook_files(**fields)
+                self.add_release_files(root, files)
+                self.assertEqual(self.validate_with_inventory(root, set(files)), [])
+
+    def test_hook_paths_reject_missing_outside_and_traversal_targets(self) -> None:
+        for target in ("hooks/missing.sh", "scripts/validate_plugin.py", "hooks/../scripts/validate_plugin.py", "hooks/nested/example.sh", "hooks/example.sh/extra"):
+            for use_args in (False, True):
+                with self.subTest(target=target, use_args=use_args):
+                    root = self.make_plugin()
+                    reference = "${CLAUDE_PLUGIN_ROOT}/" + target
+                    files = self.hook_files("sh", args=[reference]) if use_args else self.hook_files('"' + reference + '"')
+                    self.add_release_files(root, files)
+                    problems = self.validate_with_inventory(root, set(files))
+                    self.assertTrue(any("invalid hook target" in problem for problem in problems), problems)
+
+    def test_hook_paths_check_every_reference_and_expected_inventory(self) -> None:
+        root = self.make_plugin()
+        files = self.hook_files('"${CLAUDE_PLUGIN_ROOT}/hooks/example.sh"; "${CLAUDE_PLUGIN_ROOT}/hooks/missing.sh"')
+        self.add_release_files(root, files)
+        problems = self.validate_with_inventory(root, set(files))
+        self.assertTrue(any("invalid hook target" in problem and "missing.sh" in problem for problem in problems), problems)
+        files = self.hook_files()
+        self.add_release_files(root, files)
+        problems = self.validate_with_inventory(root, {"hooks/hooks.json"})
+        self.assertTrue(any("invalid hook target" in problem and "example.sh" in problem for problem in problems), problems)
+
+    def test_hook_paths_reject_malformed_shell_quoting(self) -> None:
+        root = self.make_plugin()
+        files = self.hook_files('"${CLAUDE_PLUGIN_ROOT}/hooks/example.sh')
+        self.add_release_files(root, files)
+        problems = self.validate_with_inventory(root, set(files))
+        self.assertTrue(any("invalid command quoting" in problem for problem in problems), problems)
+
+    def run_synthetic_tools(self, tool: str | None = None, tests: str | None = None) -> subprocess.CompletedProcess[str]:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        runner = root / "scripts/run_tool_tests.py"
+        runner.parent.mkdir()
+        shutil.copy2(REPO_ROOT / "scripts/run_tool_tests.py", runner)
+        if tool is not None:
+            self.add_release_files(root, {"tools/example.py": tool})
+        if tests is not None:
+            self.add_release_files(root, {"tools/tests/test_example.py": tests})
+        return subprocess.run([sys.executable, "-B", str(runner)], cwd=root.parent, capture_output=True, text=True, check=False)
+
+    def test_tool_runner_empty_tools_passes(self) -> None:
+        result = self.run_synthetic_tools()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=0 tests=0 skipped=0 result=PASS")
+
+    def test_tool_runner_synthetic_pair_passes(self) -> None:
+        result = self.run_synthetic_tools("VALUE = 42\n", "import unittest\nfrom tools.example import VALUE\nclass Example(unittest.TestCase):\n    def test_value(self):\n        self.assertEqual(VALUE, 42)\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=1 skipped=0 result=PASS")
+
+    def test_tool_runner_synthetic_pair_fails(self) -> None:
+        result = self.run_synthetic_tools("VALUE = 42\n", "import unittest\nclass Example(unittest.TestCase):\n    def test_value(self):\n        self.fail('synthetic failure')\n")
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=1 skipped=0 result=FAIL")
+
+    def test_tool_runner_zero_tests_fails(self) -> None:
+        result = self.run_synthetic_tools("VALUE = 42\n", "# no test cases\n")
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=0 skipped=0 result=FAIL")
+
+    def test_tool_runner_all_skipped_fails(self) -> None:
+        result = self.run_synthetic_tools("VALUE = 42\n", "import unittest\nclass Example(unittest.TestCase):\n    @unittest.skip('synthetic skip')\n    def test_value(self):\n        pass\n")
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=1 skipped=1 result=FAIL")
+
+    def test_tool_runner_missing_tests_fails(self) -> None:
+        result = self.run_synthetic_tools("VALUE = 42\n")
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=0 skipped=0 result=FAIL")
 
 
 if __name__ == "__main__":
