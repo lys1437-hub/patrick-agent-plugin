@@ -8,53 +8,39 @@ import unittest
 from pathlib import Path
 
 
-class ExecutionCountingResult(unittest.TextTestResult):
-    """Count tests that really ran, keeping test, fixture and subtest skips apart.
+class NonSkippedResult(unittest.TextTestResult):
+    """Note whether at least one started test was not skipped as a whole.
 
-    ``testsRun`` counts started tests, while ``skipped`` also holds class or
-    module fixture skips (never started) and subtest skips (inside a started
-    test), so the two numbers cannot be subtracted.  A started test counts as
-    executed unless the test itself was skipped, or it used subtests and every
-    one of them was skipped.
+    A start/stop interval qualifies unless ``addSkip`` names that same test
+    object, which covers method or class decorators, setUp, the test body,
+    tearDown and cleanups.  Class or module fixture skips and subtest skips
+    never disqualify an interval, so a run whose subtests are all skipped can
+    still pass.  This is a floor for the whole suite, not a count of executed
+    assertions or subtests, nor per-tool or per-OS coverage.  ``testsRun`` and
+    the skip records use different units and are never subtracted.
     """
 
     def __init__(self, *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
-        self.executed = 0
-        self._current: unittest.TestCase | None = None
-        self._current_skipped = False
-        self._subtests_seen = 0
-        self._subtests_skipped = 0
+        self.has_non_skipped_test = False
+        self._active: unittest.TestCase | None = None
+        self._test_skipped = False
 
     def startTest(self, test: unittest.TestCase) -> None:
         super().startTest(test)
-        self._current = test
-        self._current_skipped = False
-        self._subtests_seen = 0
-        self._subtests_skipped = 0
+        self._active = test
+        self._test_skipped = False
 
     def addSkip(self, test: unittest.TestCase, reason: str) -> None:
         super().addSkip(test, reason)
-        if self._current is None:
-            return
-        if test is self._current:
-            self._current_skipped = True
-        elif getattr(test, "test_case", None) is self._current:
-            self._subtests_seen += 1
-            self._subtests_skipped += 1
-
-    def addSubTest(self, test: unittest.TestCase, subtest: unittest.TestCase, err: object) -> None:
-        super().addSubTest(test, subtest, err)
-        if test is self._current:
-            self._subtests_seen += 1
+        if test is self._active:
+            self._test_skipped = True
 
     def stopTest(self, test: unittest.TestCase) -> None:
+        if test is self._active:
+            self.has_non_skipped_test |= not self._test_skipped
+            self._active = None
         super().stopTest(test)
-        if test is self._current:
-            all_subtests_skipped = self._subtests_seen > 0 and self._subtests_skipped == self._subtests_seen
-            if not self._current_skipped and not all_subtests_skipped:
-                self.executed += 1
-        self._current = None
 
 
 def main() -> int:
@@ -71,11 +57,11 @@ def main() -> int:
         sys.path.insert(0, str(root))
         try:
             suite = unittest.defaultTestLoader.discover(str(tests_path), pattern="test_*.py")
-            runner = unittest.TextTestRunner(stream=sys.stderr, verbosity=2, resultclass=ExecutionCountingResult)
+            runner = unittest.TextTestRunner(stream=sys.stderr, verbosity=2, resultclass=NonSkippedResult)
             result = runner.run(suite)
             tests_run = result.testsRun
             skipped = len(result.skipped)
-            passed = result.wasSuccessful() and result.executed > 0
+            passed = result.wasSuccessful() and result.testsRun > 0 and result.has_non_skipped_test
         except BaseException as error:  # any early exit, including SystemExit(0), must fail
             tests_run = skipped = 0
             passed = False

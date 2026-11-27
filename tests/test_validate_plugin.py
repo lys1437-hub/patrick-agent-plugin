@@ -853,7 +853,7 @@ class PluginValidationTests(unittest.TestCase):
         problems = self.validate_with_inventory(root, set(files))
         self.assertTrue(any("invalid command quoting" in problem for problem in problems), problems)
 
-    def run_synthetic_tools(self, tool: str | None = None, tests: str | None = None) -> subprocess.CompletedProcess[str]:
+    def run_synthetic_tools(self, tool: str | None = None, tests: str | None = None, extra: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
@@ -864,7 +864,14 @@ class PluginValidationTests(unittest.TestCase):
             self.add_release_files(root, {"tools/example.py": tool})
         if tests is not None:
             self.add_release_files(root, {"tools/tests/test_example.py": tests})
+        if extra is not None:
+            self.add_release_files(root, extra)
         return subprocess.run([sys.executable, "-B", str(runner)], cwd=root.parent, capture_output=True, text=True, check=False)
+
+    def assert_tool_runner(self, tests: str, line: str, extra: dict[str, str] | None = None) -> None:
+        result = self.run_synthetic_tools("VALUE = 42\n", tests, extra)
+        self.assertEqual(result.returncode, 0 if line.endswith("result=PASS") else 1, result.stderr)
+        self.assertEqual(result.stdout.splitlines()[-1], line, result.stderr)
 
     def test_tool_runner_empty_tools_passes(self) -> None:
         result = self.run_synthetic_tools()
@@ -921,10 +928,90 @@ class PluginValidationTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=0 skipped=1 result=FAIL")
 
-    def test_tool_runner_all_subtests_skipped_fails(self) -> None:
+    def test_tool_runner_all_subtests_skipped_passes(self) -> None:
         result = self.run_synthetic_tools("VALUE = 42\n", "import unittest\nclass Example(unittest.TestCase):\n    def test_value(self):\n        for case in ('a', 'b'):\n            with self.subTest(case=case):\n                self.skipTest('synthetic subtest skip')\n")
-        self.assertEqual(result.returncode, 1)
-        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=1 skipped=2 result=FAIL")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=1 skipped=2 result=PASS")
+
+    def test_tool_runner_tools_dir_without_tools_passes(self) -> None:
+        result = self.run_synthetic_tools(None, "import unittest\nclass Example(unittest.TestCase):\n    def test_value(self):\n        pass\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=0 tests=0 skipped=0 result=PASS")
+
+    def test_tool_runner_load_tests_empty_suite_fails(self) -> None:
+        self.assert_tool_runner("import unittest\ndef load_tests(loader, tests, pattern):\n    return unittest.TestSuite()\n", "TOOL_TESTS tools=1 tests=0 skipped=0 result=FAIL")
+
+    def test_tool_runner_load_tests_base_exceptions_fail(self) -> None:
+        for error in ("SystemExit(3)", "KeyboardInterrupt()", "type('Abort', (BaseException,), {})()"):
+            with self.subTest(error=error):
+                self.assert_tool_runner(f"def load_tests(loader, tests, pattern):\n    raise {error}\n", "TOOL_TESTS tools=1 tests=0 skipped=0 result=FAIL")
+
+    def test_tool_runner_module_fixture_skip_with_passing_test_passes(self) -> None:
+        skipped = {"tools/tests/test_other.py": "import unittest\ndef setUpModule():\n    raise unittest.SkipTest('synthetic module skip')\nclass Other(unittest.TestCase):\n    def test_value(self):\n        pass\n"}
+        self.assert_tool_runner("import unittest\nclass Example(unittest.TestCase):\n    def test_value(self):\n        pass\n", "TOOL_TESTS tools=1 tests=1 skipped=1 result=PASS", skipped)
+
+    def test_tool_runner_subtest_skip_before_run_passes(self) -> None:
+        self.assert_tool_runner("import unittest\nclass Example(unittest.TestCase):\n    def test_value(self):\n        for case in ('skip', 'run'):\n            with self.subTest(case=case):\n                if case == 'skip':\n                    self.skipTest('synthetic subtest skip')\n                self.assertEqual(1, 1)\n", "TOOL_TESTS tools=1 tests=1 skipped=1 result=PASS")
+
+    def test_tool_runner_test_level_skips_fail(self) -> None:
+        for name, source in {
+            "class decorator": "@unittest.skip('synthetic skip')\nclass Example(unittest.TestCase):\n    def test_value(self):\n        pass\n",
+            "setUp": "class Example(unittest.TestCase):\n    def setUp(self):\n        self.skipTest('synthetic setUp skip')\n    def test_value(self):\n        pass\n",
+        }.items():
+            with self.subTest(case=name):
+                self.assert_tool_runner("import unittest\n" + source, "TOOL_TESTS tools=1 tests=1 skipped=1 result=FAIL")
+
+    def test_tool_runner_class_fixture_skip_fails(self) -> None:
+        self.assert_tool_runner("import unittest\nclass Example(unittest.TestCase):\n    @classmethod\n    def setUpClass(cls):\n        raise unittest.SkipTest('synthetic class skip')\n    def test_value(self):\n        pass\n", "TOOL_TESTS tools=1 tests=0 skipped=1 result=FAIL")
+
+    def test_tool_runner_teardown_class_skip_with_passing_test_passes(self) -> None:
+        self.assert_tool_runner("import unittest\nclass Example(unittest.TestCase):\n    @classmethod\n    def tearDownClass(cls):\n        raise unittest.SkipTest('synthetic class skip')\n    def test_value(self):\n        pass\n", "TOOL_TESTS tools=1 tests=1 skipped=1 result=PASS")
+
+    def test_tool_runner_teardown_and_cleanup_skips_fail(self) -> None:
+        cleanup = "class Example(unittest.TestCase):\n    def skip(self):\n        self.skipTest('synthetic cleanup skip')\n    def test_value(self):\n        self.addCleanup(self.skip)\n        self.addCleanup(self.skip)\n"
+        teardown = "class Example(unittest.TestCase):\n    def tearDown(self):\n        self.skipTest('synthetic tearDown skip')\n    def test_value(self):\n        pass\n"
+        for name, source, skipped in (("tearDown", teardown, 1), ("cleanups", cleanup, 2)):
+            with self.subTest(case=name):
+                self.assert_tool_runner("import unittest\n" + source, f"TOOL_TESTS tools=1 tests=1 skipped={skipped} result=FAIL")
+
+    def test_tool_runner_cleanup_skips_beside_passing_test_pass(self) -> None:
+        self.assert_tool_runner("import unittest\nclass Example(unittest.TestCase):\n    def skip(self):\n        self.skipTest('synthetic cleanup skip')\n    def test_a_runs(self):\n        pass\n    def test_b_skips(self):\n        self.addCleanup(self.skip)\n        self.addCleanup(self.skip)\n", "TOOL_TESTS tools=1 tests=2 skipped=2 result=PASS")
+
+    def test_tool_runner_expected_failure_and_unexpected_success(self) -> None:
+        for body, line in (("self.assertEqual(1, 2)", "TOOL_TESTS tools=1 tests=1 skipped=0 result=PASS"), ("pass", "TOOL_TESTS tools=1 tests=1 skipped=0 result=FAIL")):
+            with self.subTest(body=body):
+                self.assert_tool_runner(f"import unittest\nclass Example(unittest.TestCase):\n    @unittest.expectedFailure\n    def test_value(self):\n        {body}\n", line)
+
+    def test_tool_runner_expected_failure_with_subtest_skip_passes(self) -> None:
+        for order, skipped in ((("skip", "fail"), 1), (("fail", "skip"), 0), (("skip", "pass"), 1), (("pass", "skip"), 1)):
+            with self.subTest(order=order):
+                self.assert_tool_runner(f"import unittest\nclass Example(unittest.TestCase):\n    @unittest.expectedFailure\n    def test_value(self):\n        for case in {order!r}:\n            with self.subTest(case=case):\n                if case == 'skip':\n                    self.skipTest('synthetic subtest skip')\n                self.assertEqual(1, 2 if case == 'fail' else 1)\n", f"TOOL_TESTS tools=1 tests=1 skipped={skipped} result=PASS")
+
+    def test_tool_runner_nested_and_late_subtest_skips_pass(self) -> None:
+        nested = "        with self.subTest(outer=1):\n            for case in ('a', 'b'):\n                with self.subTest(case=case):\n                    self.skipTest('synthetic subtest skip')\n"
+        late = "        self.assertEqual(1, 1)\n        for case in ('a', 'b'):\n            with self.subTest(case=case):\n                self.skipTest('synthetic subtest skip')\n"
+        empty = "        for case in ():\n            with self.subTest(case=case):\n                self.skipTest('synthetic subtest skip')\n"
+        for name, body, skipped in (("nested", nested, 2), ("after assertion", late, 2), ("empty loop", empty, 0)):
+            with self.subTest(case=name):
+                self.assert_tool_runner("import unittest\nclass Example(unittest.TestCase):\n    def test_value(self):\n" + body, f"TOOL_TESTS tools=1 tests=1 skipped={skipped} result=PASS")
+
+    def test_tool_runner_rerun_same_instance_passes(self) -> None:
+        self.assert_tool_runner("import unittest\nclass Example(unittest.TestCase):\n    runs = 0\n    def test_value(self):\n        type(self).runs += 1\n        if type(self).runs == 1:\n            self.skipTest('synthetic first-run skip')\ndef load_tests(loader, tests, pattern):\n    case = Example('test_value')\n    return unittest.TestSuite([case, case])\n", "TOOL_TESTS tools=1 tests=2 skipped=1 result=PASS")
+
+    def test_tool_runner_native_errors_fail(self) -> None:
+        method = "class Example(unittest.TestCase):\n    def {0}(self):\n        raise RuntimeError('synthetic error')\n    def test_value(self):\n        {1}\n"
+        failfast = "class Example(unittest.TestCase):\n    def test_a_fails(self):\n        self.fail('synthetic failure')\n    def test_b_runs(self):\n        pass\nclass FailFast(unittest.TestSuite):\n    def run(self, result, debug=False):\n        result.failfast = True\n        return super().run(result, debug)\ndef load_tests(loader, tests, pattern):\n    return FailFast(loader.loadTestsFromTestCase(Example))\n"
+        cases = (
+            ("setUp", method.format("setUp", "pass"), 1),
+            ("body", method.format("helper", "self.helper()"), 1),
+            ("tearDown", method.format("tearDown", "pass"), 1),
+            ("cleanup", method.format("helper", "self.addCleanup(self.helper)"), 1),
+            ("setUpClass", "class Example(unittest.TestCase):\n    @classmethod\n    def setUpClass(cls):\n        raise RuntimeError('synthetic error')\n    def test_value(self):\n        pass\n", 0),
+            ("failfast", failfast, 1),
+        )
+        for name, source, tests in cases:
+            with self.subTest(case=name):
+                self.assert_tool_runner("import unittest\n" + source, f"TOOL_TESTS tools=1 tests={tests} skipped=0 result=FAIL")
 
 
 if __name__ == "__main__":
