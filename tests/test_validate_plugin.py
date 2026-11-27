@@ -896,6 +896,36 @@ class PluginValidationTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=0 skipped=0 result=FAIL")
 
+    def test_tool_runner_load_tests_system_exit_fails(self) -> None:
+        result = self.run_synthetic_tools("VALUE = 42\n", "def load_tests(loader, tests, pattern):\n    raise SystemExit(0)\n")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=0 skipped=0 result=FAIL")
+
+    def test_tool_runner_fixture_base_exception_fails(self) -> None:
+        result = self.run_synthetic_tools("VALUE = 42\n", "import unittest\nclass Abort(BaseException):\n    pass\nclass Example(unittest.TestCase):\n    @classmethod\n    def setUpClass(cls):\n        raise Abort('synthetic early exit')\n    def test_value(self):\n        pass\n")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=0 skipped=0 result=FAIL")
+
+    def test_tool_runner_class_fixture_skip_with_passing_test_passes(self) -> None:
+        result = self.run_synthetic_tools("VALUE = 42\n", "import unittest\nfrom tools.example import VALUE\nclass Runs(unittest.TestCase):\n    def test_value(self):\n        self.assertEqual(VALUE, 42)\nclass Skipped(unittest.TestCase):\n    @classmethod\n    def setUpClass(cls):\n        raise unittest.SkipTest('synthetic fixture skip')\n    def test_value(self):\n        pass\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=1 skipped=1 result=PASS")
+
+    def test_tool_runner_partial_subtest_skip_passes(self) -> None:
+        result = self.run_synthetic_tools("VALUE = 42\n", "import unittest\nfrom tools.example import VALUE\nclass Example(unittest.TestCase):\n    def test_value(self):\n        for case in ('run', 'skip'):\n            with self.subTest(case=case):\n                if case == 'skip':\n                    self.skipTest('synthetic subtest skip')\n                self.assertEqual(VALUE, 42)\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=1 skipped=1 result=PASS")
+
+    def test_tool_runner_module_fixture_skip_fails(self) -> None:
+        result = self.run_synthetic_tools("VALUE = 42\n", "import unittest\ndef setUpModule():\n    raise unittest.SkipTest('synthetic module skip')\nclass Example(unittest.TestCase):\n    def test_value(self):\n        pass\n")
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=0 skipped=1 result=FAIL")
+
+    def test_tool_runner_all_subtests_skipped_fails(self) -> None:
+        result = self.run_synthetic_tools("VALUE = 42\n", "import unittest\nclass Example(unittest.TestCase):\n    def test_value(self):\n        for case in ('a', 'b'):\n            with self.subTest(case=case):\n                self.skipTest('synthetic subtest skip')\n")
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=1 skipped=2 result=FAIL")
+
 
 if __name__ == "__main__":
     unittest.main()
