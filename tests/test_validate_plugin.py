@@ -9,12 +9,14 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.validate_plugin import validate as validate_in_process
+from scripts import validate_plugin as validator_module
 
 VALIDATOR = REPO_ROOT / "scripts" / "validate_plugin.py"
 
@@ -692,6 +694,324 @@ class PluginValidationTests(unittest.TestCase):
         result = self.validate(root)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Skill set mismatch", result.stderr)
+
+
+    def add_release_files(self, root: Path, files: dict[str, str]) -> None:
+        for relative, contents in files.items():
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(contents, encoding="utf-8")
+
+    def validate_with_inventory(self, root: Path, extra: set[str]) -> list[str]:
+        with mock.patch.object(validator_module, "EXPECTED_TRACKED_PATHS", validator_module.EXPECTED_TRACKED_PATHS | extra):
+            return validate_in_process(root)
+
+    def tool_files(self) -> dict[str, str]:
+        return {
+            "tools/example.py": "# SPDX-License-Identifier: Apache-2.0\nraise RuntimeError('must never execute')\n",
+            "tools/tests/test_example.py": "raise RuntimeError('must never import')\n",
+        }
+
+    def hook_files(self, command: str = '"${CLAUDE_PLUGIN_ROOT}/hooks/example.sh"', **fields: object) -> dict[str, str]:
+        handler = {"type": "command", "command": command, **fields}
+        return {
+            "hooks/hooks.json": json.dumps({"hooks": {"SessionStart": [{"matcher": "startup", "hooks": [handler]}]}}),
+            "hooks/example.sh": "#!/bin/sh\nexit 0\n",
+        }
+
+    def test_synthetic_tool_and_default_hooks_pass_without_execution(self) -> None:
+        root = self.make_plugin()
+        files = {**self.tool_files(), **self.hook_files()}
+        self.add_release_files(root, files)
+        self.assertEqual(self.validate_with_inventory(root, set(files)), [])
+
+    def test_tool_requires_matching_test(self) -> None:
+        root = self.make_plugin()
+        files = self.tool_files()
+        files.pop("tools/tests/test_example.py")
+        self.add_release_files(root, files)
+        self.assertIn("tool requires matching test: tools/example.py", self.validate_with_inventory(root, set(files)))
+
+    def test_tool_test_requires_matching_tool(self) -> None:
+        root = self.make_plugin()
+        files = self.tool_files()
+        files.pop("tools/example.py")
+        self.add_release_files(root, files)
+        self.assertIn("tool test requires matching tool: tools/tests/test_example.py", self.validate_with_inventory(root, set(files)))
+
+    def test_tool_requires_exact_license_in_first_five_lines(self) -> None:
+        for contents in ("pass\n", "# SPDX-License-Identifier: MIT\n", "\n" * 5 + "# SPDX-License-Identifier: Apache-2.0\n", " # SPDX-License-Identifier: Apache-2.0\n"):
+            with self.subTest(contents=contents):
+                root = self.make_plugin()
+                files = self.tool_files()
+                files["tools/example.py"] = contents
+                self.add_release_files(root, files)
+                self.assertIn("tool requires Apache-2.0 SPDX line in first five lines: tools/example.py", self.validate_with_inventory(root, set(files)))
+
+    def test_tool_license_on_fifth_line_passes(self) -> None:
+        root = self.make_plugin()
+        files = self.tool_files()
+        files["tools/example.py"] = "\n" * 4 + "# SPDX-License-Identifier: Apache-2.0\n"
+        self.add_release_files(root, files)
+        self.assertEqual(self.validate_with_inventory(root, set(files)), [])
+
+    def test_new_paths_keep_exact_release_inventory(self) -> None:
+        root = self.make_plugin()
+        files = {**self.tool_files(), **self.hook_files()}
+        self.add_release_files(root, files)
+        problems = validate_in_process(root)
+        for relative in files:
+            self.assertIn(f"unexpected release path: {relative}", problems)
+
+    def test_new_path_allowlist_is_shallow_and_suffix_specific(self) -> None:
+        for relative in ("tools/example.py", "tools/tests/test_example.py", "hooks/example.py", "hooks/example.sh", "hooks/hooks.json"):
+            with self.subTest(allowed=relative):
+                self.assertTrue(validator_module.is_allowed(Path(relative)))
+        for relative in ("tools/example.sh", "tools/example.json", "tools/nested/example.py", "tools/tests/example.py", "tools/tests/deep/test_example.py", "tools/__init__.py", "tools/tests/test___init__.py", "hooks/nested/example.sh", "hooks/example.txt", "hooks/example.bin", "portfolio/example.sh", "unknown/example.py"):
+            with self.subTest(rejected=relative):
+                self.assertFalse(validator_module.is_allowed(Path(relative)))
+
+    def test_new_paths_reject_disallowed_file_types_in_payload(self) -> None:
+        for relative in ("tools/example.sh", "hooks/example.txt", "hooks/example.bin"):
+            with self.subTest(relative=relative):
+                root = self.make_plugin()
+                self.add_release_files(root, {relative: "synthetic fixture\n"})
+                problems = self.validate_with_inventory(root, {relative})
+                expected = "forbidden payload file type" if relative.endswith(".bin") else "unknown payload path or file type"
+                self.assertIn(f"{expected}: {relative}", problems)
+
+    def test_manifest_hooks_field_always_uses_default_only_error(self) -> None:
+        for value in ("./hooks/hooks.json", "./other.json", ["./hooks/hooks.json"], {"SessionStart": []}, None):
+            with self.subTest(value=value):
+                root = self.make_plugin()
+                path = root / ".claude-plugin/plugin.json"
+                plugin = json.loads(path.read_text(encoding="utf-8"))
+                plugin["hooks"] = value
+                path.write_text(json.dumps(plugin), encoding="utf-8")
+                result = self.validate(root)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("plugin.json must not declare hooks; this plugin only allows the default hooks/hooks.json", result.stderr)
+
+    def test_default_hooks_reject_invalid_json_and_utf8(self) -> None:
+        for contents in (b"{", b"\xff"):
+            with self.subTest(contents=contents):
+                root = self.make_plugin()
+                self.add_release_files(root, {"hooks/hooks.json": "{}"})
+                (root / "hooks/hooks.json").write_bytes(contents)
+                problems = self.validate_with_inventory(root, {"hooks/hooks.json"})
+                self.assertTrue(any("hooks/hooks.json must be valid JSON" in problem for problem in problems), problems)
+
+    def test_default_hooks_reject_unsupported_structures(self) -> None:
+        values = ([], {}, {"SessionStart": []}, {"hooks": []}, {"hooks": {}, "modules": []}, {"hooks": {"SessionStart": {}}}, {"hooks": {"SessionStart": ["other.json"]}}, {"hooks": {"SessionStart": [{"hooks": {}}]}}, {"hooks": {"SessionStart": [{"hooks": [{"type": "http", "url": "https://example.invalid"}]}]}}, {"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "echo", "args": "wrong"}]}]}})
+        for value in values:
+            with self.subTest(value=value):
+                root = self.make_plugin()
+                self.add_release_files(root, {"hooks/hooks.json": json.dumps(value)})
+                problems = self.validate_with_inventory(root, {"hooks/hooks.json"})
+                self.assertTrue(any("hooks/hooks.json" in problem for problem in problems), problems)
+
+    def test_hook_paths_accept_both_shell_quotes_and_exec_args(self) -> None:
+        handlers = (
+            {'command': '"${CLAUDE_PLUGIN_ROOT}"/hooks/example.sh'},
+            {'command': '"${CLAUDE_PLUGIN_ROOT}/hooks/example.sh"'},
+            {'command': 'sh', 'args': ['${CLAUDE_PLUGIN_ROOT}/hooks/example.sh']},
+            {'command': '${CLAUDE_PLUGIN_ROOT}/hooks/example.sh', 'args': []},
+        )
+        for fields in handlers:
+            with self.subTest(fields=fields):
+                root = self.make_plugin()
+                files = self.hook_files(**fields)
+                self.add_release_files(root, files)
+                self.assertEqual(self.validate_with_inventory(root, set(files)), [])
+
+    def test_hook_paths_reject_missing_outside_and_traversal_targets(self) -> None:
+        for target in ("hooks/missing.sh", "scripts/validate_plugin.py", "hooks/../scripts/validate_plugin.py", "hooks/nested/example.sh", "hooks/example.sh/extra"):
+            for use_args in (False, True):
+                with self.subTest(target=target, use_args=use_args):
+                    root = self.make_plugin()
+                    reference = "${CLAUDE_PLUGIN_ROOT}/" + target
+                    files = self.hook_files("sh", args=[reference]) if use_args else self.hook_files('"' + reference + '"')
+                    self.add_release_files(root, files)
+                    problems = self.validate_with_inventory(root, set(files))
+                    self.assertTrue(any("invalid hook target" in problem for problem in problems), problems)
+
+    def test_hook_paths_check_every_reference_and_expected_inventory(self) -> None:
+        root = self.make_plugin()
+        files = self.hook_files('"${CLAUDE_PLUGIN_ROOT}/hooks/example.sh"; "${CLAUDE_PLUGIN_ROOT}/hooks/missing.sh"')
+        self.add_release_files(root, files)
+        problems = self.validate_with_inventory(root, set(files))
+        self.assertTrue(any("invalid hook target" in problem and "missing.sh" in problem for problem in problems), problems)
+        files = self.hook_files()
+        self.add_release_files(root, files)
+        problems = self.validate_with_inventory(root, {"hooks/hooks.json"})
+        self.assertTrue(any("invalid hook target" in problem and "example.sh" in problem for problem in problems), problems)
+
+    def test_hook_paths_reject_malformed_shell_quoting(self) -> None:
+        root = self.make_plugin()
+        files = self.hook_files('"${CLAUDE_PLUGIN_ROOT}/hooks/example.sh')
+        self.add_release_files(root, files)
+        problems = self.validate_with_inventory(root, set(files))
+        self.assertTrue(any("invalid command quoting" in problem for problem in problems), problems)
+
+    def run_synthetic_tools(self, tool: str | None = None, tests: str | None = None, extra: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        runner = root / "scripts/run_tool_tests.py"
+        runner.parent.mkdir()
+        shutil.copy2(REPO_ROOT / "scripts/run_tool_tests.py", runner)
+        if tool is not None:
+            self.add_release_files(root, {"tools/example.py": tool})
+        if tests is not None:
+            self.add_release_files(root, {"tools/tests/test_example.py": tests})
+        if extra is not None:
+            self.add_release_files(root, extra)
+        return subprocess.run([sys.executable, "-B", str(runner)], cwd=root.parent, capture_output=True, text=True, check=False)
+
+    def assert_tool_runner(self, tests: str, line: str, extra: dict[str, str] | None = None) -> None:
+        result = self.run_synthetic_tools("VALUE = 42\n", tests, extra)
+        self.assertEqual(result.returncode, 0 if line.endswith("result=PASS") else 1, result.stderr)
+        self.assertEqual(result.stdout.splitlines()[-1], line, result.stderr)
+
+    def test_tool_runner_empty_tools_passes(self) -> None:
+        result = self.run_synthetic_tools()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=0 tests=0 skipped=0 result=PASS")
+
+    def test_tool_runner_synthetic_pair_passes(self) -> None:
+        result = self.run_synthetic_tools("VALUE = 42\n", "import unittest\nfrom tools.example import VALUE\nclass Example(unittest.TestCase):\n    def test_value(self):\n        self.assertEqual(VALUE, 42)\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=1 skipped=0 result=PASS")
+
+    def test_tool_runner_synthetic_pair_fails(self) -> None:
+        result = self.run_synthetic_tools("VALUE = 42\n", "import unittest\nclass Example(unittest.TestCase):\n    def test_value(self):\n        self.fail('synthetic failure')\n")
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=1 skipped=0 result=FAIL")
+
+    def test_tool_runner_zero_tests_fails(self) -> None:
+        result = self.run_synthetic_tools("VALUE = 42\n", "# no test cases\n")
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=0 skipped=0 result=FAIL")
+
+    def test_tool_runner_all_skipped_fails(self) -> None:
+        result = self.run_synthetic_tools("VALUE = 42\n", "import unittest\nclass Example(unittest.TestCase):\n    @unittest.skip('synthetic skip')\n    def test_value(self):\n        pass\n")
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=1 skipped=1 result=FAIL")
+
+    def test_tool_runner_missing_tests_fails(self) -> None:
+        result = self.run_synthetic_tools("VALUE = 42\n")
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=0 skipped=0 result=FAIL")
+
+    def test_tool_runner_load_tests_system_exit_fails(self) -> None:
+        result = self.run_synthetic_tools("VALUE = 42\n", "def load_tests(loader, tests, pattern):\n    raise SystemExit(0)\n")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=0 skipped=0 result=FAIL")
+
+    def test_tool_runner_fixture_base_exception_fails(self) -> None:
+        result = self.run_synthetic_tools("VALUE = 42\n", "import unittest\nclass Abort(BaseException):\n    pass\nclass Example(unittest.TestCase):\n    @classmethod\n    def setUpClass(cls):\n        raise Abort('synthetic early exit')\n    def test_value(self):\n        pass\n")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=0 skipped=0 result=FAIL")
+
+    def test_tool_runner_class_fixture_skip_with_passing_test_passes(self) -> None:
+        result = self.run_synthetic_tools("VALUE = 42\n", "import unittest\nfrom tools.example import VALUE\nclass Runs(unittest.TestCase):\n    def test_value(self):\n        self.assertEqual(VALUE, 42)\nclass Skipped(unittest.TestCase):\n    @classmethod\n    def setUpClass(cls):\n        raise unittest.SkipTest('synthetic fixture skip')\n    def test_value(self):\n        pass\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=1 skipped=1 result=PASS")
+
+    def test_tool_runner_partial_subtest_skip_passes(self) -> None:
+        result = self.run_synthetic_tools("VALUE = 42\n", "import unittest\nfrom tools.example import VALUE\nclass Example(unittest.TestCase):\n    def test_value(self):\n        for case in ('run', 'skip'):\n            with self.subTest(case=case):\n                if case == 'skip':\n                    self.skipTest('synthetic subtest skip')\n                self.assertEqual(VALUE, 42)\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=1 skipped=1 result=PASS")
+
+    def test_tool_runner_module_fixture_skip_fails(self) -> None:
+        result = self.run_synthetic_tools("VALUE = 42\n", "import unittest\ndef setUpModule():\n    raise unittest.SkipTest('synthetic module skip')\nclass Example(unittest.TestCase):\n    def test_value(self):\n        pass\n")
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=0 skipped=1 result=FAIL")
+
+    def test_tool_runner_all_subtests_skipped_passes(self) -> None:
+        result = self.run_synthetic_tools("VALUE = 42\n", "import unittest\nclass Example(unittest.TestCase):\n    def test_value(self):\n        for case in ('a', 'b'):\n            with self.subTest(case=case):\n                self.skipTest('synthetic subtest skip')\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=1 tests=1 skipped=2 result=PASS")
+
+    def test_tool_runner_tools_dir_without_tools_passes(self) -> None:
+        result = self.run_synthetic_tools(None, "import unittest\nclass Example(unittest.TestCase):\n    def test_value(self):\n        pass\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines()[-1], "TOOL_TESTS tools=0 tests=0 skipped=0 result=PASS")
+
+    def test_tool_runner_load_tests_empty_suite_fails(self) -> None:
+        self.assert_tool_runner("import unittest\ndef load_tests(loader, tests, pattern):\n    return unittest.TestSuite()\n", "TOOL_TESTS tools=1 tests=0 skipped=0 result=FAIL")
+
+    def test_tool_runner_load_tests_base_exceptions_fail(self) -> None:
+        for error in ("SystemExit(3)", "KeyboardInterrupt()", "type('Abort', (BaseException,), {})()"):
+            with self.subTest(error=error):
+                self.assert_tool_runner(f"def load_tests(loader, tests, pattern):\n    raise {error}\n", "TOOL_TESTS tools=1 tests=0 skipped=0 result=FAIL")
+
+    def test_tool_runner_module_fixture_skip_with_passing_test_passes(self) -> None:
+        skipped = {"tools/tests/test_other.py": "import unittest\ndef setUpModule():\n    raise unittest.SkipTest('synthetic module skip')\nclass Other(unittest.TestCase):\n    def test_value(self):\n        pass\n"}
+        self.assert_tool_runner("import unittest\nclass Example(unittest.TestCase):\n    def test_value(self):\n        pass\n", "TOOL_TESTS tools=1 tests=1 skipped=1 result=PASS", skipped)
+
+    def test_tool_runner_subtest_skip_before_run_passes(self) -> None:
+        self.assert_tool_runner("import unittest\nclass Example(unittest.TestCase):\n    def test_value(self):\n        for case in ('skip', 'run'):\n            with self.subTest(case=case):\n                if case == 'skip':\n                    self.skipTest('synthetic subtest skip')\n                self.assertEqual(1, 1)\n", "TOOL_TESTS tools=1 tests=1 skipped=1 result=PASS")
+
+    def test_tool_runner_test_level_skips_fail(self) -> None:
+        for name, source in {
+            "class decorator": "@unittest.skip('synthetic skip')\nclass Example(unittest.TestCase):\n    def test_value(self):\n        pass\n",
+            "setUp": "class Example(unittest.TestCase):\n    def setUp(self):\n        self.skipTest('synthetic setUp skip')\n    def test_value(self):\n        pass\n",
+        }.items():
+            with self.subTest(case=name):
+                self.assert_tool_runner("import unittest\n" + source, "TOOL_TESTS tools=1 tests=1 skipped=1 result=FAIL")
+
+    def test_tool_runner_class_fixture_skip_fails(self) -> None:
+        self.assert_tool_runner("import unittest\nclass Example(unittest.TestCase):\n    @classmethod\n    def setUpClass(cls):\n        raise unittest.SkipTest('synthetic class skip')\n    def test_value(self):\n        pass\n", "TOOL_TESTS tools=1 tests=0 skipped=1 result=FAIL")
+
+    def test_tool_runner_teardown_class_skip_with_passing_test_passes(self) -> None:
+        self.assert_tool_runner("import unittest\nclass Example(unittest.TestCase):\n    @classmethod\n    def tearDownClass(cls):\n        raise unittest.SkipTest('synthetic class skip')\n    def test_value(self):\n        pass\n", "TOOL_TESTS tools=1 tests=1 skipped=1 result=PASS")
+
+    def test_tool_runner_teardown_and_cleanup_skips_fail(self) -> None:
+        cleanup = "class Example(unittest.TestCase):\n    def skip(self):\n        self.skipTest('synthetic cleanup skip')\n    def test_value(self):\n        self.addCleanup(self.skip)\n        self.addCleanup(self.skip)\n"
+        teardown = "class Example(unittest.TestCase):\n    def tearDown(self):\n        self.skipTest('synthetic tearDown skip')\n    def test_value(self):\n        pass\n"
+        for name, source, skipped in (("tearDown", teardown, 1), ("cleanups", cleanup, 2)):
+            with self.subTest(case=name):
+                self.assert_tool_runner("import unittest\n" + source, f"TOOL_TESTS tools=1 tests=1 skipped={skipped} result=FAIL")
+
+    def test_tool_runner_cleanup_skips_beside_passing_test_pass(self) -> None:
+        self.assert_tool_runner("import unittest\nclass Example(unittest.TestCase):\n    def skip(self):\n        self.skipTest('synthetic cleanup skip')\n    def test_a_runs(self):\n        pass\n    def test_b_skips(self):\n        self.addCleanup(self.skip)\n        self.addCleanup(self.skip)\n", "TOOL_TESTS tools=1 tests=2 skipped=2 result=PASS")
+
+    def test_tool_runner_expected_failure_and_unexpected_success(self) -> None:
+        for body, line in (("self.assertEqual(1, 2)", "TOOL_TESTS tools=1 tests=1 skipped=0 result=PASS"), ("pass", "TOOL_TESTS tools=1 tests=1 skipped=0 result=FAIL")):
+            with self.subTest(body=body):
+                self.assert_tool_runner(f"import unittest\nclass Example(unittest.TestCase):\n    @unittest.expectedFailure\n    def test_value(self):\n        {body}\n", line)
+
+    def test_tool_runner_expected_failure_with_subtest_skip_passes(self) -> None:
+        for order, skipped in ((("skip", "fail"), 1), (("fail", "skip"), 0), (("skip", "pass"), 1), (("pass", "skip"), 1)):
+            with self.subTest(order=order):
+                self.assert_tool_runner(f"import unittest\nclass Example(unittest.TestCase):\n    @unittest.expectedFailure\n    def test_value(self):\n        for case in {order!r}:\n            with self.subTest(case=case):\n                if case == 'skip':\n                    self.skipTest('synthetic subtest skip')\n                self.assertEqual(1, 2 if case == 'fail' else 1)\n", f"TOOL_TESTS tools=1 tests=1 skipped={skipped} result=PASS")
+
+    def test_tool_runner_nested_and_late_subtest_skips_pass(self) -> None:
+        nested = "        with self.subTest(outer=1):\n            for case in ('a', 'b'):\n                with self.subTest(case=case):\n                    self.skipTest('synthetic subtest skip')\n"
+        late = "        self.assertEqual(1, 1)\n        for case in ('a', 'b'):\n            with self.subTest(case=case):\n                self.skipTest('synthetic subtest skip')\n"
+        empty = "        for case in ():\n            with self.subTest(case=case):\n                self.skipTest('synthetic subtest skip')\n"
+        for name, body, skipped in (("nested", nested, 2), ("after assertion", late, 2), ("empty loop", empty, 0)):
+            with self.subTest(case=name):
+                self.assert_tool_runner("import unittest\nclass Example(unittest.TestCase):\n    def test_value(self):\n" + body, f"TOOL_TESTS tools=1 tests=1 skipped={skipped} result=PASS")
+
+    def test_tool_runner_rerun_same_instance_passes(self) -> None:
+        self.assert_tool_runner("import unittest\nclass Example(unittest.TestCase):\n    runs = 0\n    def test_value(self):\n        type(self).runs += 1\n        if type(self).runs == 1:\n            self.skipTest('synthetic first-run skip')\ndef load_tests(loader, tests, pattern):\n    case = Example('test_value')\n    return unittest.TestSuite([case, case])\n", "TOOL_TESTS tools=1 tests=2 skipped=1 result=PASS")
+
+    def test_tool_runner_native_errors_fail(self) -> None:
+        method = "class Example(unittest.TestCase):\n    def {0}(self):\n        raise RuntimeError('synthetic error')\n    def test_value(self):\n        {1}\n"
+        failfast = "class Example(unittest.TestCase):\n    def test_a_fails(self):\n        self.fail('synthetic failure')\n    def test_b_runs(self):\n        pass\nclass FailFast(unittest.TestSuite):\n    def run(self, result, debug=False):\n        result.failfast = True\n        return super().run(result, debug)\ndef load_tests(loader, tests, pattern):\n    return FailFast(loader.loadTestsFromTestCase(Example))\n"
+        cases = (
+            ("setUp", method.format("setUp", "pass"), 1),
+            ("body", method.format("helper", "self.helper()"), 1),
+            ("tearDown", method.format("tearDown", "pass"), 1),
+            ("cleanup", method.format("helper", "self.addCleanup(self.helper)"), 1),
+            ("setUpClass", "class Example(unittest.TestCase):\n    @classmethod\n    def setUpClass(cls):\n        raise RuntimeError('synthetic error')\n    def test_value(self):\n        pass\n", 0),
+            ("failfast", failfast, 1),
+        )
+        for name, source, tests in cases:
+            with self.subTest(case=name):
+                self.assert_tool_runner("import unittest\n" + source, f"TOOL_TESTS tools=1 tests={tests} skipped=0 result=FAIL")
 
 
 if __name__ == "__main__":

@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import json
+import math
 import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -49,6 +51,7 @@ portfolio/workflow/README.md
 portfolio/workflow/central-review.md
 portfolio/workflow/completion-release-template.md
 portfolio/workflow/repo-protection.md
+scripts/run_tool_tests.py
 scripts/validate_plugin.py
 skills/feature-proposal-planning/SKILL.md
 skills/feature-proposal-planning/evals/unsourced-metric/graders/must-ask-for-caliber.md
@@ -97,6 +100,7 @@ tests/test_validate_plugin.py""".splitlines())
 ALLOWED_EXACT_FILES = REQUIRED_FILES | {
     ".gitignore",
     ".github/workflows/plugin-validation.yml",
+    "scripts/run_tool_tests.py",
     "scripts/validate_plugin.py",
     "tests/test_validate_plugin.py",
 }
@@ -108,6 +112,10 @@ ALLOWED_MARKETPLACE_FIELDS = {"name", "description", "owner", "plugins"}
 ALLOWED_MARKETPLACE_ENTRY_FIELDS = {"name", "source", "description"}
 EXTERNAL_SOURCE_FIELDS = {"source", "repo", "sha"}
 REPOSITORY_COMPONENT = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
+TOOL_NAME = re.compile(r"[a-z][a-z0-9_]*")
+HOOK_FILE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*\.(?:py|sh|json)")
+PLUGIN_ROOT_REFERENCE = "${CLAUDE_PLUGIN_ROOT}"
+TOOL_LICENSE = "# SPDX-License-Identifier: Apache-2.0"
 EXPECTED_AGENT_FRONTMATTER = """---
 name: skill-auditor
 description: 掃使用者的 skill 目錄下所有 skill 的斷引用、硬編絕對路徑、description 截斷與 provenance 缺漏，回報結構化清單。**唯讀，不改檔。** 需要一次讀很多檔案時派給它，避免塞爆主對話。
@@ -148,6 +156,8 @@ def check_named_metadata(value: object, label: str, problems: list[str]) -> None
 
 
 def check_manifest_paths(root: Path, plugin: dict, marketplace: dict, problems: list[str]) -> None:
+    if "hooks" in plugin:
+        problems.append("plugin.json must not declare hooks; this plugin only allows the default hooks/hooks.json")
     for key in sorted(set(plugin) - ALLOWED_PLUGIN_FIELDS):
         problems.append(f"unsupported plugin.json field: {key}")
     if plugin.get("name") != "patrick-agent":
@@ -249,9 +259,134 @@ def is_allowed(relative: Path) -> bool:
     text = relative.as_posix()
     if text in ALLOWED_EXACT_FILES:
         return True
+    parts = relative.parts
+    if len(parts) == 2 and parts[0] == "tools":
+        return relative.suffix == ".py" and TOOL_NAME.fullmatch(relative.stem) is not None
+    if len(parts) == 3 and parts[:2] == ("tools", "tests"):
+        return relative.suffix == ".py" and relative.stem.startswith("test_") and TOOL_NAME.fullmatch(relative.stem[5:]) is not None
+    if len(parts) == 2 and parts[0] == "hooks":
+        return HOOK_FILE.fullmatch(parts[1]) is not None
     if not relative.parts or relative.parts[0] not in {"skills", "portfolio"}:
         return False
     return relative.suffix in ALLOWED_SUFFIXES or relative.name in {"LICENSE", "NOTICE"}
+
+
+def check_tool_contract(root: Path, release_paths: set[str], problems: list[str]) -> None:
+    """Inspect release sources as text; never import or execute them."""
+    tools = {path for path in release_paths if len(Path(path).parts) == 2 and path.startswith("tools/") and path.endswith(".py")}
+    tests = {path for path in release_paths if len(Path(path).parts) == 3 and path.startswith("tools/tests/") and path.endswith(".py")}
+    for relative in sorted(tools):
+        path = root / relative
+        if not TOOL_NAME.fullmatch(path.stem):
+            problems.append(f"invalid tool name: {relative}")
+            continue
+        if f"tools/tests/test_{path.stem}.py" not in tests:
+            problems.append(f"tool requires matching test: {relative}")
+        if path.is_symlink() or not path.is_file() or path.resolve().parent != root / "tools":
+            problems.append(f"tool must be a regular local file: {relative}")
+            continue
+        try:
+            if path.stat().st_size > MAX_FILE_BYTES:
+                continue  # The payload size check reports this without reading it.
+            first_lines = path.read_text(encoding="utf-8").splitlines()[:5]
+        except (OSError, UnicodeDecodeError) as error:
+            problems.append(f"tool must be readable UTF-8: {relative}: {error}")
+            continue
+        if TOOL_LICENSE not in first_lines:
+            problems.append(f"tool requires Apache-2.0 SPDX line in first five lines: {relative}")
+    for relative in sorted(tests):
+        stem = Path(relative).stem
+        if not stem.startswith("test_") or not TOOL_NAME.fullmatch(stem[5:]):
+            problems.append(f"invalid tool test name: {relative}")
+        elif f"tools/{stem[5:]}.py" not in tools:
+            problems.append(f"tool test requires matching tool: {relative}")
+
+
+def check_hook_references(root: Path, words: list[str], release_paths: set[str], problems: list[str]) -> None:
+    for word in words:
+        for match in re.finditer(re.escape(PLUGIN_ROOT_REFERENCE), word):
+            reference = word[match.start():]
+            relative = reference[len(PLUGIN_ROOT_REFERENCE) + 1:]
+            path = root / relative
+            if (
+                not reference.startswith(PLUGIN_ROOT_REFERENCE + "/hooks/")
+                or len(Path(relative).parts) != 2
+                or not is_allowed(Path(relative))
+                or relative not in EXPECTED_TRACKED_PATHS
+                or relative not in release_paths
+                or path.is_symlink()
+                or not path.is_file()
+                or path.resolve().parent != root / "hooks"
+            ):
+                problems.append(f"hooks/hooks.json invalid hook target: {reference}")
+
+
+def check_default_hooks(root: Path, release_paths: set[str], problems: list[str]) -> None:
+    relative = "hooks/hooks.json"
+    path = root / relative
+    if not path.exists() and not path.is_symlink():
+        return
+    if path.is_symlink() or not path.is_file() or path.resolve().parent != root / "hooks":
+        problems.append("hooks/hooks.json must be a regular local file")
+        return
+    if path.stat().st_size > MAX_FILE_BYTES:
+        return  # The payload size check reports this without reading it.
+    config = load_json(root, relative, problems)
+    if config is None:
+        return
+    if set(config) - {"hooks", "description"} or not isinstance(config.get("hooks"), dict):
+        problems.append("hooks/hooks.json requires a hooks object and only an optional description")
+        return
+    if "description" in config and not isinstance(config["description"], str):
+        problems.append("hooks/hooks.json description must be a string")
+    fields = {"type", "command", "args", "if", "timeout", "statusMessage", "once", "async", "asyncRewake", "shell", "onFailure"}
+    for event, groups in config["hooks"].items():
+        if not isinstance(groups, list):
+            problems.append(f"hooks/hooks.json event must contain a list: {event}")
+            continue
+        for group in groups:
+            if not isinstance(group, dict) or set(group) - {"matcher", "hooks"} or not isinstance(group.get("hooks"), list):
+                problems.append(f"hooks/hooks.json requires inline matcher groups: {event}")
+                continue
+            if "matcher" in group and not isinstance(group["matcher"], str):
+                problems.append(f"hooks/hooks.json matcher must be a string: {event}")
+            for handler in group["hooks"]:
+                if not isinstance(handler, dict) or handler.get("type") != "command" or set(handler) - fields:
+                    problems.append(f"hooks/hooks.json only supports inline command handlers: {event}")
+                    continue
+                command = handler.get("command")
+                if not isinstance(command, str) or not command.strip():
+                    problems.append(f"hooks/hooks.json command must be a non-empty string: {event}")
+                    continue
+                args = handler.get("args", [])
+                if not isinstance(args, list) or any(not isinstance(arg, str) for arg in args):
+                    problems.append(f"hooks/hooks.json args must be a list of strings: {event}")
+                    continue
+                for key in ("if", "statusMessage"):
+                    if key in handler and not isinstance(handler[key], str):
+                        problems.append(f"hooks/hooks.json {key} must be a string: {event}")
+                for key in ("once", "async", "asyncRewake"):
+                    if key in handler and not isinstance(handler[key], bool):
+                        problems.append(f"hooks/hooks.json {key} must be a boolean: {event}")
+                timeout = handler.get("timeout", 600)
+                if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0:
+                    problems.append(f"hooks/hooks.json timeout must be a finite positive number: {event}")
+                if "shell" in handler and handler["shell"] not in ("bash", "powershell"):
+                    problems.append(f"hooks/hooks.json unsupported shell: {event}")
+                if "onFailure" in handler and handler["onFailure"] not in ("continue", "block"):
+                    problems.append(f"hooks/hooks.json unsupported onFailure: {event}")
+                if "args" in handler:
+                    words = [command, *args]
+                else:
+                    try:
+                        lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
+                        lexer.whitespace_split = True
+                        lexer.commenters = ""
+                        words = list(lexer)
+                    except ValueError:
+                        problems.append(f"hooks/hooks.json invalid command quoting: {event}")
+                        continue
+                check_hook_references(root, words, release_paths, problems)
 
 
 def tracked_payload_entries(root: Path) -> list[tuple[str, Path]] | None:
@@ -378,6 +513,8 @@ def validate(root: Path) -> list[str]:
         if not entry.is_file() or (tracked_paths is not None and relative_entry not in tracked_paths):
             problems.append(f"missing required Skill entry: skills/{skill}/SKILL.md")
     check_payload(root, problems, tracked_entries)
+    check_tool_contract(root, release_paths, problems)
+    check_default_hooks(root, release_paths, problems)
     return problems
 
 
